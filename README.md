@@ -1,1 +1,2 @@
 MUD-repo initial commit
+I’m making a open world rpg that is meant to allow players to go on pre-written adventures & make their own like a DnD game. An added bonus is the aspect of a living world, but that isn’t a priority. For now though, we’ll concentrate on making the game, instead on the multiplayer aspect. Can you guys put here what code we’re using & things related to that, if its something worth noting?
