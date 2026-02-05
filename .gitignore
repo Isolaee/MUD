@@ -7,6 +7,8 @@ __pycache__/
 venv/
 .venv/
 env/
+mud-venv/
+.mud-venv/
 
 # IDE
 .idea/
