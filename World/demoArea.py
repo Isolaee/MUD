@@ -1,19 +1,6 @@
-from Objects.item import Item, ItemType
+from Objects.Items import weapons
 from Objects.room import Room, Description
-
-
-class SimpleItem(Item):
-    def __init__(
-        self,
-        name: str,
-        item_type: ItemType,
-        is_magical: bool = False,
-    ) -> None:
-        super().__init__(name, item_type, is_magical)
-
-    def object_type(self) -> str:
-        return "SimpleItem"
-
+from World.FirstTown import introTown
 
 # -- rooms --
 
@@ -33,13 +20,15 @@ room2.description = Description(
 )
 
 intro_room.add_connection(room2)
+intro_room.add_connection(introTown.square)
+introTown.square.add_connection(intro_room)
 room2.add_connection(intro_room)
 
 # -- items --
 
-intro_sword = SimpleItem(
-    "Intro Sword", ItemType.WEAPONS
-)
+intro_sword = weapons.Sword(
+    name="Intro Sword", durability=100, degrades=True, is_magical=False
+    )
 intro_room.add_item(intro_sword)
 
 # -- area entry point --
