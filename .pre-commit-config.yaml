@@ -21,3 +21,13 @@ repos:
     rev: 6.1.0
     hooks:
       - id: flake8
+
+  - repo: local
+    hooks:
+      - id: restage-fixes
+        name: Re-stage hook-modified files
+        entry: powershell.exe -ExecutionPolicy Bypass -File scripts/restage-fixes.ps1
+        language: system
+        always_run: true
+        pass_filenames: false
+        stages: [pre-commit]
