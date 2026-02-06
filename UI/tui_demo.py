@@ -2,9 +2,9 @@
 Interactive MUD Game TUI using Rich.
 
 Launches a full-screen terminal UI with threaded keyboard input.
-All game logic is dummy/placeholder — this is a UI test.
+Uses Room objects from World.demoArea for game data.
 
-Run: python UI/tui_demo.py
+Run: python -m UI.tui_demo
 """
 
 import msvcrt
@@ -19,123 +19,34 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-
-# ---------------------------------------------------------------------------
-# Dummy room data
-# ---------------------------------------------------------------------------
-ROOMS = {
-    "cavern": (
-        "[bold]Misty Cavern[/bold]\n"
-        "\n"
-        "You stand in a damp cavern. Water drips from\n"
-        "stalactites above. The air is thick with mist.\n"
-        "\n"
-        "A [bold yellow]locked iron door[/bold yellow] blocks the way north.\n"
-        "A narrow passage leads [cyan]east[/cyan].\n"
-        "The path back goes [cyan]south[/cyan].\n"
-        "\n"
-    ),
-    "forest": (
-        "[bold]Darkwood Forest[/bold]\n"
-        "\n"
-        "Tall trees blot out the sky. The underbrush\n"
-        "is thick and tangled. A faint trail winds north.\n"
-        "\n"
-        "Exits: [cyan]north[/cyan], [cyan]west[/cyan]."
-    ),
-    "clearing": (
-        "[bold]Sunlit Clearing[/bold]\n"
-        "\n"
-        "A peaceful clearing bathed in sunlight.\n"
-        "Wildflowers dot the grass.\n"
-        "\n"
-        "Exits: [cyan]south[/cyan], [cyan]east[/cyan]."
-    ),
-    "ruins": (
-        "[bold]Ancient Ruins[/bold]\n"
-        "\n"
-        "Crumbling stone walls surround you. Vines\n"
-        "creep over carved symbols you cannot read.\n"
-        "\n"
-        "Exits: [cyan]west[/cyan], [cyan]south[/cyan]."
-    ),
-}
-
-# Simple movement graph: room -> {direction: room}
-EXITS = {
-    "cavern": {"south": "forest", "east": "ruins"},
-    "forest": {"north": "cavern", "west": "clearing"},
-    "clearing": {"east": "forest", "south": "ruins"},
-    "ruins": {"west": "cavern", "north": "clearing"},
-}
-
-# Map art per room (player position changes)
-MAP_ART = {
-    "cavern": (
-        "[dim]·  ·  ·  ·  ·[/dim]\n"
-        "[dim]·[/dim]  [cyan]#[/cyan]──[cyan]#[/cyan]  [dim]·[/dim]\n"
-        "[dim]·[/dim]  [dim]|[/dim]  [dim]|[/dim]  [dim]·[/dim]\n"
-        "[dim]·[/dim]     [dim]|[/dim]  [dim]·[/dim]\n"
-        "[dim]·[/dim]     [cyan]#[/cyan]  [dim]·[/dim]\n"
-        "[dim]·  ·  ·  ·  ·[/dim]"
-    ),
-    "forest": (
-        "[dim]·  ·  ·  ·  ·[/dim]\n"
-        "[dim]·[/dim]  [cyan]#[/cyan]──[cyan]#[/cyan]  [dim]·[/dim]\n"
-        "[dim]·[/dim]  [dim]|[/dim]  [dim]|[/dim]  [dim]·[/dim]\n"
-        "[dim]·[/dim]  [cyan]#[/cyan]──[cyan]#[/cyan]  [dim]·[/dim]\n"
-        "[dim]·[/dim]     [dim]|[/dim]  [dim]·[/dim]\n"
-        "[dim]·[/dim]     [bold yellow]@[/bold yellow]  [dim]·[/dim]\n"
-        "[dim]·  ·  ·  ·  ·[/dim]"
-    ),
-    "clearing": (
-        "[dim]·  ·  ·  ·  ·[/dim]\n"
-
-        "[dim]·[/dim]  [dim]|[/dim]  [dim]|[/dim]  [dim]·[/dim]\n"
-        "[dim]·[/dim]  [cyan]#[/cyan]──[cyan]#[/cyan]  [dim]·[/dim]\n"
-        "[dim]·[/dim]     [dim]|[/dim]  [dim]·[/dim]\n"
-        "[dim]·[/dim]     [cyan]#[/cyan]  [dim]·[/dim]\n"
-        "[dim]·  ·  ·  ·  ·[/dim]"
-    ),
-    "ruins": (
-        "[dim]·  ·  ·  ·  ·[/dim]\n"
-        "[dim]·[/dim]  [cyan]#[/cyan]──"
-        "[bold yellow]@[/bold yellow]  [dim]·[/dim]\n"
-        "[dim]·[/dim]  [dim]|[/dim]  [dim]|[/dim]  [dim]·[/dim]\n"
-        "[dim]·[/dim]  [cyan]#[/cyan]──[cyan]#[/cyan]  [dim]·[/dim]\n"
-        "[dim]·[/dim]     [dim]|[/dim]  [dim]·[/dim]\n"
-        "[dim]·[/dim]     [cyan]#[/cyan]  [dim]·[/dim]\n"
-        "[dim]·  ·  ·  ·  ·[/dim]"
-    ),
-}
+from Objects.room import Room
+from World.demoArea import START_ROOM
 
 
-# ---------------------------------------------------------------------------
+# ---------------------------------------------------------------
 # GameUI — mutable state + rendering
-# ---------------------------------------------------------------------------
+# ---------------------------------------------------------------
 class GameUI:
     MAX_HISTORY = 50
 
-    def __init__(self) -> None:
+    def __init__(self, start: Room) -> None:
         self.running = True
         self.input_buffer = ""
-        self.current_room = "cavern"
+        self.current_room: Room = start
         self.event_history: list[str] = [
             "[dim]Welcome to the MUD! Type "
             "[bold]help[/bold] for commands.[/dim]",
-            "[dim]You find yourself in a misty cavern...[/dim]",
         ]
+        self._cmd_look()
 
-    # -- command handling ---------------------------------------------------
+    # -- command handling ------------------------------------
 
     def dispatch(self, raw: str) -> None:
         cmd = raw.strip().lower()
         if not cmd:
             return
 
-        if cmd in ("north", "south", "east", "west"):
-            self._cmd_move(cmd)
-        elif cmd == "look":
+        if cmd == "look":
             self._cmd_look()
         elif cmd in ("inventory", "inv"):
             self._cmd_inventory()
@@ -144,44 +55,67 @@ class GameUI:
         elif cmd in ("quit", "exit"):
             self.running = False
         else:
-            self.event_history.append(
-                f"[red]Unknown command:[/red] {cmd}. "
-                "Type [bold]help[/bold] for available commands."
-            )
+            self._cmd_go(cmd)
 
         self._trim_history()
 
-    def _cmd_move(self, direction: str) -> None:
-        exits = EXITS.get(self.current_room, {})
-        if direction in exits:
-            self.current_room = exits[direction]
-            room_name = self.current_room.replace("_", " ").title()
-            self.event_history.append(
-                f"[dim]You walk {direction} to the {room_name}.[/dim]"
-            )
-        else:
-            self.event_history.append(
-                f"[yellow]You can't go {direction} from here.[/yellow]"
-            )
+    def _cmd_go(self, target: str) -> None:
+        target_lower = target.lower()
+        for room in self.current_room.connected_rooms:
+            if room.name.lower() == target_lower:
+                self.current_room = room
+                self.event_history.append(
+                    f"[dim]You move to {room.name}.[/dim]"
+                )
+                self._cmd_look()
+                return
+        self.event_history.append(
+            f"[red]Unknown command:[/red] {target}. "
+            "Type [bold]help[/bold] for commands."
+        )
 
     def _cmd_look(self) -> None:
-        self.event_history.append("[dim]You look around...[/dim]")
+        desc = self.current_room.description
+        if desc and desc.long:
+            self.event_history.append(
+                f"[dim]{desc.long}[/dim]"
+            )
+        elif desc:
+            self.event_history.append(
+                f"[dim]{desc.short}[/dim]"
+            )
 
     def _cmd_inventory(self) -> None:
-        self.event_history.append("[dim]You rummage through your bag...[/dim]")
+        items = self.current_room.present_items
+        if not items:
+            self.event_history.append(
+                "[dim]Nothing here.[/dim]"
+            )
+            return
+        for item in items:
+            self.event_history.append(
+                f"  [white]- {item.name}[/white]"
+            )
 
     def _cmd_help(self) -> None:
-        self.event_history.append(
-            "[bold]Commands:[/bold] north, south, east, west, "
-            "look, inventory (inv), help, quit"
+        exits = ", ".join(
+            r.name for r in self.current_room.connected_rooms
         )
+        self.event_history.append(
+            "[bold]Commands:[/bold] look, "
+            "inventory (inv), help, quit"
+        )
+        if exits:
+            self.event_history.append(
+                f"[bold]Go to:[/bold] {exits}"
+            )
 
     def _trim_history(self) -> None:
         if len(self.event_history) > self.MAX_HISTORY:
             cutoff = -self.MAX_HISTORY
             self.event_history = self.event_history[cutoff:]
 
-    # -- panel builders -----------------------------------------------------
+    # -- panel builders --------------------------------------
 
     def make_event_history(self) -> Panel:
         lines = "\n".join(self.event_history[-20:])
@@ -193,9 +127,24 @@ class GameUI:
         )
 
     def make_current_events(self) -> Panel:
-        room_text = ROOMS.get(self.current_room, "You are nowhere.")
+        room = self.current_room
+        desc = room.description
+        parts = [f"[bold]{room.name}[/bold]\n"]
+        if desc:
+            parts.append(desc.long or desc.short)
+        exits = ", ".join(
+            f"[cyan]{r.name}[/cyan]"
+            for r in room.connected_rooms
+        )
+        if exits:
+            parts.append(f"\nExits: {exits}")
+        items = room.present_items
+        if items:
+            parts.append("\n[yellow]Items here:[/yellow]")
+            for item in items:
+                parts.append(f"  - {item.name}")
         return Panel(
-            Text.from_markup(room_text),
+            Text.from_markup("\n".join(parts)),
             title="[bold]Current Events[/bold]",
             border_style="green",
             box=box.ROUNDED,
@@ -203,7 +152,9 @@ class GameUI:
 
     def make_writing_interface(self) -> Panel:
         return Panel(
-            Text.from_markup(f"> {self.input_buffer}█"),
+            Text.from_markup(
+                f"> {self.input_buffer}\u2588"
+            ),
             title="[bold]Command[/bold]",
             border_style="white",
             box=box.ROUNDED,
@@ -211,16 +162,17 @@ class GameUI:
         )
 
     def make_map(self) -> Panel:
-        art = MAP_ART.get(self.current_room, "")
         return Panel(
-            Text.from_markup(art),
+            Text.from_markup("[dim]No map data[/dim]"),
             title="[bold]Map[/bold]",
             border_style="yellow",
             box=box.ROUNDED,
         )
 
     def make_stats(self) -> Panel:
-        table = Table(show_header=False, box=None, padding=(0, 1))
+        table = Table(
+            show_header=False, box=None, padding=(0, 1)
+        )
         table.add_column("stat", style="bold")
         table.add_column("value", justify="right")
         table.add_row("HP", "[red]45[/red] / 60")
@@ -238,23 +190,22 @@ class GameUI:
         )
 
     def make_inventory(self) -> Panel:
-        items = Text.from_markup(
-            "[white]1.[/white] Iron Sword\n"
-            "[white]2.[/white] Leather Armor\n"
-            "[white]3.[/white] Health Potion [dim]x3[/dim]\n"
-            "[white]4.[/white] [bold yellow]Silver Key[/bold yellow]\n"
-            "[white]5.[/white] Torch [dim]x2[/dim]\n"
-            "\n"
-            "[dim]Gold: 47[/dim]"
-        )
+        items = self.current_room.present_items
+        if items:
+            lines = "\n".join(
+                f"[white]{i + 1}.[/white] {item.name}"
+                for i, item in enumerate(items)
+            )
+        else:
+            lines = "[dim]Nothing here.[/dim]"
         return Panel(
-            items,
+            Text.from_markup(lines),
             title="[bold]Inventory[/bold]",
             border_style="magenta",
             box=box.ROUNDED,
         )
 
-    # -- layout builder -----------------------------------------------------
+    # -- layout builder --------------------------------------
 
     def build_layout(self) -> Layout:
         layout = Layout()
@@ -274,8 +225,12 @@ class GameUI:
         )
 
         layout["left"].update(self.make_event_history())
-        layout["current_events"].update(self.make_current_events())
-        layout["writing"].update(self.make_writing_interface())
+        layout["current_events"].update(
+            self.make_current_events()
+        )
+        layout["writing"].update(
+            self.make_writing_interface()
+        )
         layout["map"].update(self.make_map())
         layout["stats"].update(self.make_stats())
         layout["inventory"].update(self.make_inventory())
@@ -283,22 +238,21 @@ class GameUI:
         return layout
 
 
-# ---------------------------------------------------------------------------
+# ---------------------------------------------------------------
 # Input thread — reads keystrokes via msvcrt (Windows)
-# ---------------------------------------------------------------------------
+# ---------------------------------------------------------------
 def input_loop(ui: GameUI) -> None:
     while ui.running:
         if msvcrt.kbhit():
             ch = msvcrt.getwch()
-
-            if ch == "\r":  # Enter
+            if ch == "\r":
                 ui.dispatch(ui.input_buffer)
                 ui.input_buffer = ""
-            elif ch == "\x08":  # Backspace
+            elif ch == "\x08":
                 ui.input_buffer = ui.input_buffer[:-1]
-            elif ch == "\x1b":  # Escape — ignore
+            elif ch == "\x1b":
                 pass
-            elif ch in ("\x00", "\xe0"):  # Special key prefix — consume next
+            elif ch in ("\x00", "\xe0"):
                 msvcrt.getwch()
             elif ch.isprintable():
                 ui.input_buffer += ch
@@ -306,14 +260,16 @@ def input_loop(ui: GameUI) -> None:
             time.sleep(0.02)
 
 
-# ---------------------------------------------------------------------------
+# ---------------------------------------------------------------
 # Main entry
-# ---------------------------------------------------------------------------
+# ---------------------------------------------------------------
 def main() -> None:
     console = Console()
-    ui = GameUI()
+    ui = GameUI(START_ROOM)
 
-    thread = threading.Thread(target=input_loop, args=(ui,), daemon=True)
+    thread = threading.Thread(
+        target=input_loop, args=(ui,), daemon=True
+    )
     thread.start()
 
     with Live(
@@ -327,7 +283,9 @@ def main() -> None:
             time.sleep(0.1)
 
     console.clear()
-    console.print("[bold]Thanks for playing! Goodbye.[/bold]")
+    console.print(
+        "[bold]Thanks for playing! Goodbye.[/bold]"
+    )
 
 
 if __name__ == "__main__":
