@@ -1,5 +1,5 @@
 from Objects.Items import weapons
-from Objects.room import Room, Description
+from Objects.room import Room, Description, Direction
 from World.FirstTown import introTown
 
 # -- rooms --
@@ -19,10 +19,10 @@ room2.description = Description(
     long="An empty stone room. The exit is west.",
 )
 
-intro_room.add_connection(room2)
-intro_room.add_connection(introTown.square)
-introTown.square.add_connection(intro_room)
-room2.add_connection(intro_room)
+intro_room.add_connection(room2, Direction.EAST)
+intro_room.add_connection(
+    introTown.square, Direction.NORTH
+)
 
 # -- items --
 

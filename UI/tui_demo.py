@@ -61,11 +61,14 @@ class GameUI:
 
     def _cmd_go(self, target: str) -> None:
         target_lower = target.lower()
-        for room in self.current_room.connected_rooms:
+        connections = self.current_room.connected_rooms
+        for direction, room in connections.items():
             if room.name.lower() == target_lower:
                 self.current_room = room
                 self.event_history.append(
-                    f"[dim]You move to {room.name}.[/dim]"
+                    "[dim]You move "
+                    f"{direction.name.replace('_', ' ').lower()}"
+                    f" to {room.name}.[/dim]"
                 )
                 self._cmd_look()
                 return
@@ -98,8 +101,10 @@ class GameUI:
             )
 
     def _cmd_help(self) -> None:
+        connections = self.current_room.connected_rooms
         exits = ", ".join(
-            r.name for r in self.current_room.connected_rooms
+            f"{r.name} ({d.name.replace('_', ' ').lower()})"
+            for d, r in connections.items()
         )
         self.event_history.append(
             "[bold]Commands:[/bold] look, "
@@ -134,7 +139,8 @@ class GameUI:
             parts.append(desc.long or desc.short)
         exits = ", ".join(
             f"[cyan]{r.name}[/cyan]"
-            for r in room.connected_rooms
+            f" ({d.name.replace('_', ' ').lower()})"
+            for d, r in room.connected_rooms.items()
         )
         if exits:
             parts.append(f"\nExits: {exits}")
