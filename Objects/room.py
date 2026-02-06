@@ -32,6 +32,17 @@ OPPOSITE = {
     Direction.NORTH_WEST: Direction.SOUTH_EAST,
 }
 
+DIR_VECTOR: dict[Direction, tuple[int, int]] = {
+    Direction.NORTH: (0, -1),
+    Direction.NORTH_EAST: (1, -1),
+    Direction.EAST: (1, 0),
+    Direction.SOUTH_EAST: (1, 1),
+    Direction.SOUTH: (0, 1),
+    Direction.SOUTH_WEST: (-1, 1),
+    Direction.WEST: (-1, 0),
+    Direction.NORTH_WEST: (-1, -1),
+}
+
 
 class Description:
     def __init__(
