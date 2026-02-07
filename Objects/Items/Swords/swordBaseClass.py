@@ -1,4 +1,4 @@
-from Objects.Items import Weapon
+from Objects.Items.weapons import Weapon
 
 
 class Sword(Weapon):
