@@ -1,24 +1,10 @@
 repos:
-  - repo: local
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    # Ruff version.
+    rev: v0.15.0
     hooks:
-      - id: python-fmt-and-stage
-        name: Python Format (Auto-stage)
-        entry: python scripts/fmt_and_stage.py
-        language: python
-        types: [python]
-        pass_filenames: false
-        stages: [pre-commit]
-
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
-    hooks:
-      # trailing-whitespace and end-of-file-fixer are handled by
-      # the local `python-fmt-and-stage` hook to avoid downstream
-      # modifications during pre-commit and accidental failures.
-      - id: check-yaml
-      - id: check-added-large-files
-
-  - repo: https://github.com/pycqa/flake8
-    rev: 6.1.0
-    hooks:
-      - id: flake8
+      # Run the linter.
+      - id: ruff-check
+        args: [--fix]
+      # Run the formatter.
+      - id: ruff-format
