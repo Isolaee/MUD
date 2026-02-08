@@ -29,9 +29,7 @@ def make_current_events(ui: GameUI) -> Panel:
 	parts = [f"[bold]{room.name}[/bold]\n"]
 	if desc:
 		parts.append(desc.long or desc.short)
-	exits = ", ".join(
-		f"[cyan]{r.name}[/cyan] ({d.name.replace('_', ' ').lower()})" for d, r in room.connected_rooms.items()
-	)
+	exits = ", ".join(f"[cyan]{r.name}[/cyan]" for r in room.connected_rooms.values())
 	if exits:
 		parts.append(f"\nExits: {exits}")
 	items = room.present_items
