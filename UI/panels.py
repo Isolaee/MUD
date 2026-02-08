@@ -21,9 +21,9 @@ if TYPE_CHECKING:
 def make_event_history(ui: GameUI) -> Panel:
 	"""Build the scrollable event-history panel (left column).
 
-	Shows the most recent 20 log messages from the event history.
+	Shows the most recent 5 log messages from the event history.
 	"""
-	lines = "\n".join(ui.event_history[-20:])
+	lines = "\n".join(ui.event_history[-5:])
 	return Panel(
 		Text.from_markup(lines),
 		title="[bold]Event History[/bold]",
@@ -74,7 +74,7 @@ def make_stats() -> Panel:
 	TODO: Wire up to a real PlayerCharacter once stats are implemented.
 	"""
 	table = Table(show_header=False, box=None, padding=(0, 1))
-	table.add_column("stat", style="bold")
+	table.add_column("stats", style="bold")
 	table.add_column("value", justify="right")
 	table.add_row("HP", "[red]45[/red] / 60")
 	table.add_row("MP", "[blue]20[/blue] / 20")
@@ -85,7 +85,7 @@ def make_stats() -> Panel:
 	table.add_row("XP", "230 / 500")
 	return Panel(
 		table,
-		title="[bold]Stats[/bold]",
+		title="[bold]Character Stats[/bold]",
 		border_style="red",
 		box=box.ROUNDED,
 	)

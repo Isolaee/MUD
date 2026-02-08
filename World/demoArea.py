@@ -47,6 +47,8 @@ sword = ShortSword(
 	name="Short Sword", durability=100, degrades=False, reach=1, is_magical=False, attackBonus=2, onHitEffect=[]
 )
 
+intro_room.present_items.append(sword)
+
 # -- area entry point --
 
 START_ROOM = intro_room
