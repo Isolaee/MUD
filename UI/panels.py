@@ -1,4 +1,9 @@
-"""Rich panel builders for the TUI layout."""
+"""Rich panel builders for the TUI layout.
+
+Each ``make_*`` function returns a Rich Panel that is slotted into
+the Layout constructed by ``GameUI.build_layout()``.  Panels are
+rebuilt every frame so they always reflect the latest game state.
+"""
 
 from __future__ import annotations
 
@@ -14,6 +19,10 @@ if TYPE_CHECKING:
 
 
 def make_event_history(ui: GameUI) -> Panel:
+	"""Build the scrollable event-history panel (left column).
+
+	Shows the most recent 20 log messages from the event history.
+	"""
 	lines = "\n".join(ui.event_history[-20:])
 	return Panel(
 		Text.from_markup(lines),
@@ -24,14 +33,17 @@ def make_event_history(ui: GameUI) -> Panel:
 
 
 def make_current_events(ui: GameUI) -> Panel:
+	"""Build the main view panel showing room name, description, exits, and items."""
 	room = ui.current_room
 	desc = room.description
 	parts = [f"[bold]{room.name}[/bold]\n"]
 	if desc:
 		parts.append(desc.long or desc.short)
+	# List exits as clickable-looking cyan names
 	exits = ", ".join(f"[cyan]{r.name}[/cyan]" for r in room.connected_rooms.values())
 	if exits:
 		parts.append(f"\nExits: {exits}")
+	# List items lying on the floor
 	items = room.present_items
 	if items:
 		parts.append("\n[yellow]Items here:[/yellow]")
@@ -46,6 +58,7 @@ def make_current_events(ui: GameUI) -> Panel:
 
 
 def make_writing_interface(ui: GameUI) -> Panel:
+	"""Build the command-input panel with a blinking-cursor character."""
 	return Panel(
 		Text.from_markup(f"> {ui.input_buffer}\u2588"),
 		title="[bold]Command[/bold]",
@@ -56,6 +69,10 @@ def make_writing_interface(ui: GameUI) -> Panel:
 
 
 def make_stats() -> Panel:
+	"""Build the character stats panel (placeholder with hardcoded values).
+
+	TODO: Wire up to a real PlayerCharacter once stats are implemented.
+	"""
 	table = Table(show_header=False, box=None, padding=(0, 1))
 	table.add_column("stat", style="bold")
 	table.add_column("value", justify="right")
@@ -75,6 +92,10 @@ def make_stats() -> Panel:
 
 
 def make_inventory(ui: GameUI) -> Panel:
+	"""Build the inventory panel listing items in the current room.
+
+	Note: Currently shows room items, not character inventory.
+	"""
 	items = ui.current_room.present_items
 	if items:
 		lines = "\n".join(f"[white]{i + 1}.[/white] {item.name}" for i, item in enumerate(items))

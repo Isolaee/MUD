@@ -1,3 +1,10 @@
+"""Weapon base class and damage-type definitions.
+
+Weapons are Items that can be used in combat.  Each weapon carries
+an attack bonus, hit chance, damage type, and a list of effects
+triggered on a successful hit.
+"""
+
 from __future__ import annotations
 
 from abc import ABC
@@ -7,6 +14,8 @@ from Objects.item import Item, ItemType
 
 
 class DamageType(Enum):
+	"""Elemental / physical damage types used by the combat system."""
+
 	PHYSICAL = auto()
 	FIRE = auto()
 	ICE = auto()
@@ -18,7 +27,16 @@ class DamageType(Enum):
 
 
 class Weapon(Item, ABC):
-	"""Virtual base class for all weapons."""
+	"""Virtual base class for all weapons.
+
+	Automatically sets its ItemType to WEAPONS.
+
+	Attributes:
+		attackBonus: Flat modifier added to attack rolls.
+		onHitEffect: List of effects applied when the weapon hits.
+		hitChance: Probability (0.0-1.0) of landing a hit.
+		damageType: The type of damage this weapon deals.
+	"""
 
 	def __init__(
 		self,
