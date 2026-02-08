@@ -39,3 +39,6 @@ class Item(GameObject, ABC):
 
 	def object_type(self) -> str:
 		return "Item"
+
+	def get_name(self) -> str:
+		return self.name
