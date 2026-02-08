@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum, auto
 
-from Objects.room import Direction, Room
+from Objects.room import Room
 
 
 class Action(Enum):
@@ -21,10 +21,6 @@ class ActionResult:
 	messages: list[str] = field(default_factory=list)
 	new_room: Room | None = None
 	quit: bool = False
-
-
-# Map direction name strings to Direction enum for movement shortcuts.
-_DIRECTION_NAMES: dict[str, Direction] = {d.name.lower().replace("_", " "): d for d in Direction}
 
 
 def parse(raw: str, current_room: Room) -> tuple[Action, list]:
@@ -55,7 +51,7 @@ def parse(raw: str, current_room: Room) -> tuple[Action, list]:
 		target = _resolve_move_target(arg, current_room)
 		return Action.MOVE, [target]
 
-	# Bare word — try as direction name or room name
+	# Bare word — try as room name
 	full = raw.strip().lower()
 	target = _resolve_move_target(full, current_room)
 	return Action.MOVE, [target]
@@ -97,14 +93,7 @@ def _resolve_look_target(arg: str, current_room: Room):
 
 
 def _resolve_move_target(arg: str, current_room: Room):
-	"""Resolve a movement target by direction name or room name."""
-	# Try direction name (e.g. "north", "south east")
-	if arg in _DIRECTION_NAMES:
-		direction = _DIRECTION_NAMES[arg]
-		if direction in current_room.connected_rooms:
-			return current_room.connected_rooms[direction]
-
-	# Try room name
+	"""Resolve a movement target by room name."""
 	for room in current_room.connected_rooms.values():
 		if room.name.lower() == arg:
 			return room
@@ -152,13 +141,7 @@ def _exec_move(inputs: list, current_room: Room) -> ActionResult:
 	target = inputs[0]
 
 	if isinstance(target, Room):
-		# Find the direction for the message
-		for direction, room in current_room.connected_rooms.items():
-			if room is target:
-				result.messages.append(
-					f"[dim]You move {direction.name.replace('_', ' ').lower()} to {target.name}.[/dim]"
-				)
-				break
+		result.messages.append(f"[dim]You move to {target.name}.[/dim]")
 		result.new_room = target
 		# Auto-look at new room
 		look_result = _exec_look([target], target)
@@ -183,8 +166,8 @@ def _exec_inventory(inputs: list, current_room: Room) -> ActionResult:
 def _exec_help(inputs: list, current_room: Room) -> ActionResult:
 	result = ActionResult()
 	connections = current_room.connected_rooms
-	exits = ", ".join(f"{r.name} ({d.name.replace('_', ' ').lower()})" for d, r in connections.items())
-	result.messages.append("[bold]Commands:[/bold] look [target], move <direction/room>, inventory (inv), help, quit")
+	exits = ", ".join(r.name for r in connections.values())
+	result.messages.append("[bold]Commands:[/bold] look [target], move <room>, inventory (inv), help, quit")
 	if exits:
 		result.messages.append(f"[bold]Go to:[/bold] {exits}")
 	return result
