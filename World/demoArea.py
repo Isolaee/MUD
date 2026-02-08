@@ -46,6 +46,10 @@ Room3.add_connection(room2, Direction.SOUTH)
 sword = ShortSword(
 	name="Short Sword", durability=100, degrades=False, reach=1, is_magical=False, attackBonus=2, onHitEffect=[]
 )
+sword.description = Description(
+	short="A basic short sword.",
+	long="A basic short sword lies here, its blade gleaming with a dull sheen. It looks sturdy and reliable, perfect for a novice adventurer.",
+)
 
 intro_room.present_items.append(sword)
 
