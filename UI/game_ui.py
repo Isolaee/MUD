@@ -1,4 +1,22 @@
-"""GameUI state and main game loop."""
+"""GameUI state container and main game loop.
+
+GameUI holds all mutable session state (current room, input buffer,
+event history) and owns the Rich layout that is redrawn every frame.
+
+The ``main()`` function is the application entry point: it creates
+the UI, spawns a keyboard-input thread, and runs a Rich Live display
+at 60 FPS until the player quits.
+
+Layout structure::
+
+    +-----------+---------------------+----------+
+    |  Event    |   Current Events    |   Map    |
+    |  History  |                     |----------|
+    |           |                     |  Stats   |
+    |           |---------------------|----------|
+    |           |  Command Input      | Inventory|
+    +-----------+---------------------+----------+
+"""
 
 import threading
 import time
@@ -21,6 +39,16 @@ from UI.panels import (
 
 
 class GameUI:
+	"""Central state object shared between the render loop and input thread.
+
+	Attributes:
+		MAX_HISTORY: Maximum number of event-log entries kept in memory.
+		running: Set to False to stop the game loop.
+		input_buffer: Characters the player has typed so far.
+		current_room: The room the player is currently in.
+		event_history: Chronological list of Rich-markup log messages.
+	"""
+
 	MAX_HISTORY = 50
 
 	def __init__(self, start: Room) -> None:
@@ -30,9 +58,16 @@ class GameUI:
 		self.event_history: list[str] = [
 			"[dim]Welcome to the MUD! Type [bold]help[/bold] for commands.[/dim]",
 		]
+		# Show the starting room description immediately
 		dispatch(self, "look")
 
 	def build_layout(self) -> Layout:
+		"""Construct the full Rich Layout for one frame.
+
+		Returns a three-column layout: event history on the left,
+		current events + command input in the centre, and map /
+		stats / inventory stacked on the right.
+		"""
 		layout = Layout()
 		layout.split_row(
 			Layout(name="left", ratio=1),
@@ -49,6 +84,7 @@ class GameUI:
 			Layout(name="inventory", ratio=1),
 		)
 
+		# Populate each panel
 		layout["left"].update(make_event_history(self))
 		layout["current_events"].update(make_current_events(self))
 		layout["writing"].update(make_writing_interface(self))
@@ -60,9 +96,15 @@ class GameUI:
 
 
 def main(start_room: Room) -> None:
+	"""Game entry point — run the TUI until the player quits.
+
+	Args:
+		start_room: The room the player begins in.
+	"""
 	console = Console()
 	ui = GameUI(start_room)
 
+	# Keyboard input runs in a daemon thread so it dies with the main thread
 	thread = threading.Thread(target=input_loop, args=(ui,), daemon=True)
 	thread.start()
 

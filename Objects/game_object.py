@@ -1,3 +1,15 @@
+"""Base class for every entity in the game world.
+
+GameObject is an abstract base class that provides:
+- A unique identifier (UUID) for each instance.
+- A generic key/value property store for extensible attributes.
+- A lightweight tag system for runtime categorisation and querying.
+- Identity semantics (equality/hashing) based on UID.
+
+All concrete game entities (Room, Character, Item, etc.) ultimately
+inherit from this class.
+"""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -5,61 +17,75 @@ from uuid import uuid4
 
 
 class GameObject(ABC):
-    """Virtual base class for all game objects.
+	"""Virtual base class for all game objects.
 
-    Every entity in the game (rooms, characters, items)
-    inherits from this.
-    """
+	Every entity in the game (rooms, characters, items)
+	inherits from this.
 
-    def __init__(self, name: str) -> None:
-        self.uid: str = uuid4().hex
-        self.name: str = name
-        self.tags: set[str] = set()
-        self._properties: dict[str, object] = {}
+	Attributes:
+	    uid: Unique hex identifier generated at creation time.
+	    name: Human-readable display name.
+	    tags: Arbitrary string tags used for categorisation.
+	    _properties: Internal dict for storing ad-hoc key/value data.
+	"""
 
-    # -- data helpers --
+	def __init__(self, name: str) -> None:
+		self.uid: str = uuid4().hex
+		self.name: str = name
+		self.tags: set[str] = set()
+		self._properties: dict[str, object] = {}
 
-    def get_prop(
-        self, key: str, default: object = None
-    ) -> object:
-        return self._properties.get(key, default)
+	# -- data helpers --
 
-    def set_prop(self, key: str, value: object) -> None:
-        self._properties[key] = value
+	def get_prop(self, key: str, default: object = None) -> object:
+		"""Retrieve a property value, returning *default* if absent."""
+		return self._properties.get(key, default)
 
-    def has_prop(self, key: str) -> bool:
-        return key in self._properties
+	def set_prop(self, key: str, value: object) -> None:
+		"""Store an arbitrary key/value property on this object."""
+		self._properties[key] = value
 
-    def remove_prop(self, key: str) -> None:
-        self._properties.pop(key, None)
+	def has_prop(self, key: str) -> bool:
+		"""Return True if the property *key* exists."""
+		return key in self._properties
 
-    # -- tag helpers --
+	def remove_prop(self, key: str) -> None:
+		"""Remove a property by key (no-op if absent)."""
+		self._properties.pop(key, None)
 
-    def add_tag(self, tag: str) -> None:
-        self.tags.add(tag)
+	# -- tag helpers --
 
-    def has_tag(self, tag: str) -> bool:
-        return tag in self.tags
+	def add_tag(self, tag: str) -> None:
+		"""Add a tag to this object."""
+		self.tags.add(tag)
 
-    def remove_tag(self, tag: str) -> None:
-        self.tags.discard(tag)
+	def has_tag(self, tag: str) -> bool:
+		"""Return True if this object carries the given tag."""
+		return tag in self.tags
 
-    # -- identity --
+	def remove_tag(self, tag: str) -> None:
+		"""Remove a tag (no-op if absent)."""
+		self.tags.discard(tag)
 
-    @abstractmethod
-    def object_type(self) -> str:
-        """Return the type label, e.g. 'room', 'item'."""
+	# -- identity --
 
-    def __repr__(self) -> str:
-        return (
-            f"{self.object_type()}("
-            f"{self.name!r}, uid={self.uid[:8]})"
-        )
+	@abstractmethod
+	def object_type(self) -> str:
+		"""Return a human-readable type label, e.g. ``'Room'``, ``'Item'``.
 
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, GameObject):
-            return NotImplemented
-        return self.uid == other.uid
+		Subclasses must override this to provide a type string
+		used in ``__repr__`` and debugging output.
+		"""
 
-    def __hash__(self) -> int:
-        return hash(self.uid)
+	def __repr__(self) -> str:
+		return f"{self.object_type()}({self.name!r}, uid={self.uid[:8]})"
+
+	def __eq__(self, other: object) -> bool:
+		"""Two GameObjects are equal iff they share the same UID."""
+		if not isinstance(other, GameObject):
+			return NotImplemented
+		return self.uid == other.uid
+
+	def __hash__(self) -> int:
+		"""Hash based on UID so GameObjects work in sets and dicts."""
+		return hash(self.uid)
