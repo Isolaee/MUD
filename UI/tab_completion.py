@@ -149,15 +149,31 @@ def complete(ui: GameUI) -> None:
 	parts = buffer.split(None, 1)
 	completing_command = len(parts) == 0 or (len(parts) == 1 and not buffer.endswith(" "))
 
+	# Handle two-word verbs (e.g. "talk to")
+	_TWO_WORD_VERBS = {"talk to": "talk_to"}
+	verb = ""
+	partial = ""
+	verb_prefix = ""
+
 	if completing_command:
 		partial = parts[0] if parts else ""
-		verb_prefix = ""
 		candidates = _get_command_candidates(partial)
 	else:
 		verb = parts[0]
 		partial = parts[1] if len(parts) > 1 else ""
-		# Keep everything up to and including the space after the verb
 		verb_prefix = verb + " "
+
+		# Check for two-word verb: "talk to <arg>"
+		if len(parts) > 1:
+			for tw, registry_key in _TWO_WORD_VERBS.items():
+				prefix = tw[len(verb) :]  # e.g. " to" when verb is "talk"
+				if parts[1].lower().startswith(prefix.lstrip()):
+					rest = parts[1][len(prefix.lstrip()) :].lstrip()
+					partial = rest
+					verb_prefix = tw + " "
+					verb = registry_key
+					break
+
 		candidates = _get_argument_candidates(verb, partial, ui.current_room)
 
 	if not candidates:

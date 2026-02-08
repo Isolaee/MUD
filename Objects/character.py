@@ -12,8 +12,12 @@ from __future__ import annotations
 
 from abc import ABC
 from enum import Enum, auto
+from typing import TYPE_CHECKING
 
 from Objects.game_object import GameObject
+
+if TYPE_CHECKING:
+	from Quests.quest import Quest
 
 
 class CharacterType(Enum):
@@ -83,9 +87,10 @@ class NonPlayerCharacter(PlayerCharacter):
 	merchants, quest-givers, or enemies.
 	"""
 
-	def __init__(self, has_enters_the_room: bool, **kwargs) -> None:
+	def __init__(self, has_enters_the_room: bool, quest: Quest | None = None, **kwargs) -> None:
 		super().__init__(**kwargs)
 		self.has_enters_the_room = has_enters_the_room
+		self.quest = quest
 
 	def object_type(self) -> CharacterType:
 		return CharacterType.NPC

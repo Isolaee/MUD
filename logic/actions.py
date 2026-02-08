@@ -19,6 +19,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum, auto
 
+from Objects.character import NonPlayerCharacter
 from Objects.room import Room
 
 # Maps each known verb to the type of targets it expects.
@@ -37,6 +38,7 @@ COMMAND_REGISTRY: dict[str, str | None] = {
 	"pick_up": "items",
 	"drop": "items",
 	"talk_to": "characters",
+	"talk to": "characters",
 	"whisper": "characters",
 }
 
@@ -103,6 +105,15 @@ def parse(raw: str, current_room: Room) -> tuple[Action, list]:
 	if verb in ("quit", "exit"):
 		return Action.QUIT, []
 
+	# Two-word verb: "talk to <target>" or underscore form "talk_to <target>"
+	if verb in ("talk_to", "talk"):
+		if verb == "talk" and arg.startswith("to "):
+			arg = arg[3:]  # strip the "to " prefix
+		elif verb == "talk" and arg == "to":
+			arg = ""
+		target = _resolve_character_target(arg, current_room)
+		return Action.TALK_TO, [target]
+
 	if verb == "move" and arg:
 		target = _resolve_move_target(arg, current_room)
 		return Action.MOVE, [target]
@@ -119,6 +130,7 @@ def execute(action: Action, inputs: list, current_room: Room) -> ActionResult:
 		Action.LOOK: _exec_look,
 		Action.MOVE: _exec_move,
 		Action.INVENTORY: _exec_inventory,
+		Action.TALK_TO: _exec_talk_to,
 		Action.HELP: _exec_help,
 		Action.QUIT: _exec_quit,
 	}
@@ -154,6 +166,16 @@ def _resolve_move_target(arg: str, current_room: Room):
 		if room.name.lower() == arg:
 			return room
 
+	return arg  # unresolved
+
+
+def _resolve_character_target(arg: str, current_room: Room):
+	"""Resolve a character target by matching against characters in the room."""
+	if not arg:
+		return arg
+	for char in current_room.present_characters:
+		if char.name.lower() == arg:
+			return char
 	return arg  # unresolved
 
 
@@ -220,6 +242,36 @@ def _exec_inventory(inputs: list, current_room: Room) -> ActionResult:
 	else:
 		for item in items:
 			result.messages.append(f"  [white]- {item.name}[/white]")
+	return result
+
+
+def _exec_talk_to(inputs: list, current_room: Room) -> ActionResult:
+	"""Talk to an NPC in the current room."""
+	result = ActionResult()
+
+	if not inputs or not inputs[0]:
+		result.messages.append("[red]Talk to whom?[/red]")
+		return result
+
+	target = inputs[0]
+
+	if isinstance(target, NonPlayerCharacter):
+		result.messages.append(f"[dim]You talk to {target.name}.[/dim]")
+		if target.quest is not None:
+			quest = target.quest
+			desc = quest.description
+			if desc and desc.long:
+				result.messages.append(f"[dim]{desc.long}[/dim]")
+			elif desc and desc.short:
+				result.messages.append(f"[dim]{desc.short}[/dim]")
+			result.messages.append(f"[yellow]Quest available: {quest.name}[/yellow]")
+		else:
+			result.messages.append(f"[dim]{target.name} has nothing to say.[/dim]")
+	elif isinstance(target, str):
+		result.messages.append(f"[red]You don't see '{target}' here.[/red]")
+	else:
+		result.messages.append("[red]You can't talk to that.[/red]")
+
 	return result
 
 
