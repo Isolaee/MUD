@@ -21,6 +21,25 @@ from enum import Enum, auto
 
 from Objects.room import Room
 
+# Maps each known verb to the type of targets it expects.
+# Used by tab_completion to generate context-aware candidates.
+# None means the command takes no arguments.
+COMMAND_REGISTRY: dict[str, str | None] = {
+	"look": "look_targets",
+	"move": "rooms",
+	"inventory": None,
+	"inv": None,
+	"help": None,
+	"quit": None,
+	"exit": None,
+	"attack": "characters",
+	"inspect": "all",
+	"pick_up": "items",
+	"drop": "items",
+	"talk_to": "characters",
+	"whisper": "characters",
+}
+
 
 class Action(Enum):
 	"""Every verb the player can type."""

@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 	from UI.game_ui import GameUI
 
 from UI.commands import dispatch
+from UI.tab_completion import complete
 
 
 def input_loop(ui: GameUI) -> None:
@@ -41,6 +42,9 @@ def input_loop(ui: GameUI) -> None:
 			elif ch == "\x08":
 				# Backspace — remove last character
 				ui.input_buffer = ui.input_buffer[:-1]
+			elif ch == "\t":
+				# Tab — trigger tab-completion
+				complete(ui)
 			elif ch == "\x1b":
 				# Escape — currently a no-op
 				pass

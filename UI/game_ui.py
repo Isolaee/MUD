@@ -49,12 +49,13 @@ class GameUI:
 		event_history: Chronological list of Rich-markup log messages.
 	"""
 
-	MAX_HISTORY = 50
+	MAX_HISTORY = 60
 
 	def __init__(self, start: Room) -> None:
 		self.running = True
 		self.input_buffer = ""
 		self.current_room: Room = start
+		self.completion_state = None  # CompletionState | None — used by tab_completion
 		self.event_history: list[str] = [
 			"[dim]Welcome to the MUD! Type [bold]help[/bold] for commands.[/dim]",
 		]
