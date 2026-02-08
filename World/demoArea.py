@@ -4,13 +4,13 @@ from World.FirstTown import introTown
 
 # -- rooms --
 
-intro_room = Room("Intro")
+intro_room = Room("Room Intro")
 intro_room.description = Description(
 	short="Small intro room.",
 	long=("A intro room with a sword on the ground. A doorway leads east."),
 )
 
-room2 = Room("Room2")
+room2 = Room("Room 2")
 room2.description = Description(
 	short="A second room.",
 	long="An empty stone room. The exit is west.",

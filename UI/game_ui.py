@@ -69,7 +69,7 @@ def main(start_room: Room) -> None:
 	with Live(
 		ui.build_layout(),
 		console=console,
-		refresh_per_second=4,
+		refresh_per_second=60,
 		screen=True,
 	) as live:
 		while ui.running:
