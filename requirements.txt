@@ -1,5 +1,6 @@
 rich>=13.0,<15.0
 pytest==9.0.2
+pre-commit==4.5.1
 colorama==0.4.6
 iniconfig==2.3.0
 packaging==26.0
