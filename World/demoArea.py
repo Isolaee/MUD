@@ -13,8 +13,10 @@ Room layout::
       +----------------------------+
 """
 
+from Objects.character import NonPlayerCharacter, Race, CharacterSize
 from Objects.Items.Swords.shortSword import ShortSword
 from Objects.room import Room, Description, Direction
+from Quests.demoQuest import DemoQuest
 from World.FirstTown import introTown
 
 # -- rooms --
@@ -46,8 +48,34 @@ Room3.add_connection(room2, Direction.SOUTH)
 sword = ShortSword(
 	name="Short Sword", durability=100, degrades=False, reach=1, is_magical=False, attackBonus=2, onHitEffect=[]
 )
+sword.description = Description(
+	short="A basic short sword.",
+	long="A basic short sword lies here, its blade gleaming with a dull sheen. It looks sturdy and reliable, perfect for a novice adventurer.",
+)
 
 intro_room.present_items.append(sword)
+
+# -- NPCs --
+
+demo_quest = DemoQuest()
+
+guide = NonPlayerCharacter(
+	name="Old Guide",
+	has_enters_the_room=False,
+	quest=demo_quest,
+	current_hp=20,
+	current_stamina=10,
+	base_attack=1,
+	race=Race.HUMAN,
+	characterSize=CharacterSize.MEDIUM,
+	inventory=[],
+)
+guide.description = Description(
+	short="An old guide.",
+	long="A weathered old man leans against the wall, eyes twinkling with quiet wisdom. He looks like he wants to talk.",
+)
+
+intro_room.present_characters.append(guide)
 
 # -- area entry point --
 
