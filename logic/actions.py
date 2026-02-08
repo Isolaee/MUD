@@ -12,6 +12,12 @@ class Action(Enum):
 	LOOK = auto()
 	MOVE = auto()
 	INVENTORY = auto()
+	ATTACK = auto()
+	Inspect = auto()
+	PICK_UP = auto()
+	DROP = auto()
+	TALK_TO = auto()
+	WHISPER = auto()
 	HELP = auto()
 	QUIT = auto()
 
@@ -167,9 +173,10 @@ def _exec_help(inputs: list, current_room: Room) -> ActionResult:
 	result = ActionResult()
 	connections = current_room.connected_rooms
 	exits = ", ".join(r.name for r in connections.values())
-	result.messages.append("[bold]Commands:[/bold] look [target], move <room>, inventory (inv), help, quit")
+	commands = ", ".join(a.name.lower().replace("_", " ") for a in Action)
+	result.messages.append(f"[bold]Commands:[/bold] {commands}")
 	if exits:
-		result.messages.append(f"[bold]Go to:[/bold] {exits}")
+		result.messages.append(f"[bold]Current exits:[/bold] {exits}")
 	return result
 
 
