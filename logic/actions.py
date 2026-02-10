@@ -22,24 +22,46 @@ from enum import Enum, auto
 from Objects.character import NonPlayerCharacter
 from Objects.room import Room
 
+# Maps alias -> canonical command name.
+# Canonical commands map to themselves implicitly.
+COMMAND_ALIASES: dict[str, str] = {
+	"mv": "move",
+	"go": "move",
+	"l": "look",
+	"inv": "inventory",
+	"i": "inventory",
+	"exit": "quit",
+	"q": "quit",
+	"talk to": "talk_to",
+	"examine": "inspect",
+	"get": "pick_up",
+	"grab": "pick_up",
+	"take": "pick_up",
+	"atk": "attack",
+	"hit": "attack",
+}
+
 # Maps each known verb to the type of targets it expects.
 # Used by tab_completion to generate context-aware candidates.
 # None means the command takes no arguments.
-COMMAND_REGISTRY: dict[str, str | None] = {
+_CANONICAL_COMMANDS: dict[str, str | None] = {
 	"look": "look_targets",
 	"move": "rooms",
 	"inventory": None,
-	"inv": None,
 	"help": None,
 	"quit": None,
-	"exit": None,
 	"attack": "characters",
 	"inspect": "all",
 	"pick_up": "items",
 	"drop": "items",
 	"talk_to": "characters",
-	"talk to": "characters",
 	"whisper": "characters",
+}
+
+# Build full registry including aliases (each alias gets the same target type).
+COMMAND_REGISTRY: dict[str, str | None] = {
+	**_CANONICAL_COMMANDS,
+	**{alias: _CANONICAL_COMMANDS[canon] for alias, canon in COMMAND_ALIASES.items() if canon in _CANONICAL_COMMANDS},
 }
 
 
@@ -93,24 +115,30 @@ def parse(raw: str, current_room: Room) -> tuple[Action, list]:
 	verb = parts[0]
 	arg = parts[1] if len(parts) > 1 else ""
 
+	# Resolve aliases to canonical command names
+	verb = COMMAND_ALIASES.get(verb, verb)
+
+	# Two-word alias: "talk to <target>"
+	if verb == "talk" and arg.startswith("to "):
+		verb = "talk_to"
+		arg = arg[3:]
+	elif verb == "talk" and arg == "to":
+		verb = "talk_to"
+		arg = ""
+
 	if verb == "look":
 		return Action.LOOK, [_resolve_look_target(arg, current_room)]
 
-	if verb in ("inventory", "inv"):
+	if verb == "inventory":
 		return Action.INVENTORY, []
 
 	if verb == "help":
 		return Action.HELP, []
 
-	if verb in ("quit", "exit"):
+	if verb == "quit":
 		return Action.QUIT, []
 
-	# Two-word verb: "talk to <target>" or underscore form "talk_to <target>"
-	if verb in ("talk_to", "talk"):
-		if verb == "talk" and arg.startswith("to "):
-			arg = arg[3:]  # strip the "to " prefix
-		elif verb == "talk" and arg == "to":
-			arg = ""
+	if verb == "talk_to":
 		target = _resolve_character_target(arg, current_room)
 		return Action.TALK_TO, [target]
 
