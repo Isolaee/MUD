@@ -32,6 +32,13 @@ class Race(Enum):
 	GNOME = auto()
 
 
+class Class(Enum):
+	WARRIOR = auto()
+	MAGE = auto()
+	ROGUE = auto()
+	CLERIC = auto()
+
+
 class CharacterSize(Enum):
 	MINIATURE = auto()  # Doll size, tiny creatures
 	SMALL = auto()  # Gnomes, halflings and goblins
