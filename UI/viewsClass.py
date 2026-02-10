@@ -26,6 +26,7 @@ class View(ABC):
 
 	def transition_to(self, view_class, *args, **kwargs) -> None:
 		"""Create a new view instance and delegate all future calls to it."""
+		self.input_buffer = ""
 		self.next_view = view_class(*args, **kwargs)
 
 	# -- public interface (called by InputHandler / Application) -----------
@@ -40,7 +41,6 @@ class View(ABC):
 	def build_layout(self):
 		"""Forward layout to next_view if transitioned, else to subclass."""
 		if self.next_view is not None:
-			self.next_view.input_buffer = self.input_buffer
 			self.running = self.next_view.running
 			return self.next_view.build_layout()
 		return self._build_layout()
