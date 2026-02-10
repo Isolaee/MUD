@@ -3,10 +3,10 @@
 Generates a small overhead map of the rooms surrounding the player.
 The algorithm:
 
-1. **BFS discovery** (``_bfs_rooms``) — walk the room graph up to
-   *max_depth* hops, assigning each room a (dx, dy) grid position.
+1. **BFS discovery** — walk the room graph up to *MAX_DEPTH* hops,
+   assigning each room a (dx, dy) grid position.
 2. **Grid placement** — each room is drawn as a 3-line ASCII box
-   on a fixed 30x19 character grid.
+   on a fixed character grid.
 3. **Path drawing** — connections between adjacent rooms are rendered
    with ``|``, ``--``, ``/``, or ``\\`` characters.
 
@@ -25,134 +25,120 @@ from rich.text import Text
 from Objects.room import Room, DIR_VECTOR
 
 
-def _bfs_rooms(current_room: Room, max_depth: int = 2):
-	"""Discover rooms reachable within *max_depth* hops via BFS.
+class MapRenderer:
+	"""BFS-based ASCII map renderer."""
 
-	Returns:
-		positions: dict mapping Room -> (dx, dy) grid coordinate.
-		edges: set of frozenset pairs representing connections to draw.
-	"""
-	positions = {current_room: (0, 0)}
-	occupied = {(0, 0): current_room}  # prevent position collisions
-	edges = set()
-	queue = deque([(current_room, 0)])
-	visited = {current_room}
+	GRID_WIDTH = 30
+	GRID_HEIGHT = 19
+	MAX_DEPTH = 2
 
-	while queue:
-		room, depth = queue.popleft()
-		room_pos = positions[room]
-		if depth >= max_depth:
-			continue
-		for d, neighbor in room.connected_rooms.items():
-			dx, dy = DIR_VECTOR[d]
-			npos = (
-				room_pos[0] + dx,
-				room_pos[1] + dy,
-			)
-			if neighbor not in positions:
-				# Clamp to a 5x5 grid (+-2 in each axis)
-				if abs(npos[0]) > 2 or abs(npos[1]) > 2:
-					continue
-				if npos in occupied:
-					continue
-				positions[neighbor] = npos
-				occupied[npos] = neighbor
-			# Record the edge for drawing later
-			p1 = positions[room]
-			p2 = positions.get(neighbor)
-			if p2 is not None:
-				edge = frozenset((p1, p2))
-				edges.add(edge)
-			if neighbor not in visited:
-				visited.add(neighbor)
-				queue.append((neighbor, depth + 1))
+	def __init__(self, current_room: Room) -> None:
+		self._room = current_room
 
-	return positions, edges
+	def build(self) -> Panel:
+		"""Build the ASCII map panel showing nearby rooms and connections."""
+		positions, edges = self._bfs_rooms()
+		g = [[" "] * self.GRID_WIDTH for _ in range(self.GRID_HEIGHT)]
 
+		# Draw room boxes
+		for room, (dx, dy) in positions.items():
+			col, row = self._grid_pos(dx, dy)
+			if room == self._room:
+				self._place_box(g, col, row, "@@", "bold yellow")
+			else:
+				self._place_box(g, col, row, room.name, "cyan")
 
-def _grid_pos(dx, dy):
-	"""Convert a room grid coordinate (dx, dy) to character-grid (col, row)."""
-	col = (dx + 2) * 6
-	row = (dy + 2) * 4
-	return col, row
+		# Draw connection paths
+		for edge in edges:
+			p1, p2 = tuple(edge)
+			self._draw_path(g, p1, p2)
 
+		out = "\n".join("".join(row) for row in g)
+		return Panel(
+			Text.from_markup(out),
+			title="[bold]Map[/bold]",
+			border_style="yellow",
+			box=box.ROUNDED,
+		)
 
-def _place_box(g, col, row, label, style):
-	"""Draw a 3-line ASCII room box at (col, row) on the character grid.
+	def _bfs_rooms(self):
+		"""Discover rooms reachable within MAX_DEPTH hops via BFS.
 
-	The box looks like::
+		Returns:
+			positions: dict mapping Room -> (dx, dy) grid coordinate.
+			edges: set of frozenset pairs representing connections to draw.
+		"""
+		positions = {self._room: (0, 0)}
+		occupied = {(0, 0): self._room}
+		edges: set = set()
+		queue = deque([(self._room, 0)])
+		visited = {self._room}
 
-		+--+
-		|Rm|
-		+--+
+		while queue:
+			room, depth = queue.popleft()
+			room_pos = positions[room]
+			if depth >= self.MAX_DEPTH:
+				continue
+			for d, neighbor in room.connected_rooms.items():
+				dx, dy = DIR_VECTOR[d]
+				npos = (room_pos[0] + dx, room_pos[1] + dy)
+				if neighbor not in positions:
+					if abs(npos[0]) > 2 or abs(npos[1]) > 2:
+						continue
+					if npos in occupied:
+						continue
+					positions[neighbor] = npos
+					occupied[npos] = neighbor
+				p1 = positions[room]
+				p2 = positions.get(neighbor)
+				if p2 is not None:
+					edges.add(frozenset((p1, p2)))
+				if neighbor not in visited:
+					visited.add(neighbor)
+					queue.append((neighbor, depth + 1))
 
-	*label* is truncated to 2 characters.
-	"""
-	s, e = f"[{style}]", f"[/{style}]"
-	g[row][col] = f"{s}+--+{e}"
-	g[row + 1][col] = f"{s}|{e}{label[:2]}{s}|{e}"
-	g[row + 2][col] = f"{s}+--+{e}"
-	# Clear cells that the box spans so they don't add extra spaces
-	for r in range(row, row + 3):
-		for c in range(col + 1, col + 4):
-			if c < len(g[0]):
-				g[r][c] = ""
+		return positions, edges
 
+	@staticmethod
+	def _grid_pos(dx, dy):
+		"""Convert a room grid coordinate (dx, dy) to character-grid (col, row)."""
+		col = (dx + 2) * 6
+		row = (dy + 2) * 4
+		return col, row
 
-def _draw_path(g, p1, p2):
-	"""Draw a connector character between two adjacent room positions.
+	@staticmethod
+	def _place_box(g, col, row, label, style):
+		"""Draw a 3-line ASCII room box at (col, row) on the character grid."""
+		s, e = f"[{style}]", f"[/{style}]"
+		g[row][col] = f"{s}+--+{e}"
+		g[row + 1][col] = f"{s}|{e}{label[:2]}{s}|{e}"
+		g[row + 2][col] = f"{s}+--+{e}"
+		for r in range(row, row + 3):
+			for c in range(col + 1, col + 4):
+				if c < len(g[0]):
+					g[r][c] = ""
 
-	Handles all 8 compass directions using |, --, /, and \\ glyphs.
-	Skips non-adjacent pairs (distance > 1 on either axis).
-	"""
-	ddx = p2[0] - p1[0]
-	ddy = p2[1] - p1[1]
-	if abs(ddx) > 1 or abs(ddy) > 1:
-		return
-	c1, r1 = _grid_pos(*p1)
-	# Place the appropriate connector based on relative direction
-	if ddx == 0 and ddy == -1:  # north
-		g[r1 - 1][c1 + 1] = "[dim]|[/dim]"
-	elif ddx == 0 and ddy == 1:  # south
-		g[r1 + 3][c1 + 1] = "[dim]|[/dim]"
-	elif ddx == 1 and ddy == 0:  # east
-		g[r1 + 1][c1 + 4] = "[dim]--[/dim]"
-	elif ddx == -1 and ddy == 0:  # west
-		g[r1 + 1][c1 - 2] = "[dim]--[/dim]"
-	elif ddx == 1 and ddy == -1:  # north-east
-		g[r1 - 1][c1 + 4] = "[dim]/[/dim]"
-	elif ddx == -1 and ddy == -1:  # north-west
-		g[r1 - 1][c1 - 1] = "[dim]\\[/dim]"
-	elif ddx == 1 and ddy == 1:  # south-east
-		g[r1 + 3][c1 + 4] = "[dim]\\[/dim]"
-	elif ddx == -1 and ddy == 1:  # south-west
-		g[r1 + 3][c1 - 1] = "[dim]/[/dim]"
-
-
-def make_map(current_room: Room) -> Panel:
-	"""Build the ASCII map panel showing nearby rooms and connections."""
-	positions, edges = _bfs_rooms(current_room, 2)
-	GW = 30  # grid width in characters
-	GH = 19  # grid height in characters
-	g = [[" "] * GW for _ in range(GH)]
-
-	# Draw room boxes
-	for room, (dx, dy) in positions.items():
-		col, row = _grid_pos(dx, dy)
-		if room == current_room:
-			_place_box(g, col, row, "@@", "bold yellow")
-		else:
-			_place_box(g, col, row, room.name, "cyan")
-
-	# Draw connection paths
-	for edge in edges:
-		p1, p2 = tuple(edge)
-		_draw_path(g, p1, p2)
-
-	out = "\n".join("".join(row) for row in g)
-	return Panel(
-		Text.from_markup(out),
-		title="[bold]Map[/bold]",
-		border_style="yellow",
-		box=box.ROUNDED,
-	)
+	@staticmethod
+	def _draw_path(g, p1, p2):
+		"""Draw a connector character between two adjacent room positions."""
+		ddx = p2[0] - p1[0]
+		ddy = p2[1] - p1[1]
+		if abs(ddx) > 1 or abs(ddy) > 1:
+			return
+		c1, r1 = MapRenderer._grid_pos(*p1)
+		if ddx == 0 and ddy == -1:
+			g[r1 - 1][c1 + 1] = "[dim]|[/dim]"
+		elif ddx == 0 and ddy == 1:
+			g[r1 + 3][c1 + 1] = "[dim]|[/dim]"
+		elif ddx == 1 and ddy == 0:
+			g[r1 + 1][c1 + 4] = "[dim]--[/dim]"
+		elif ddx == -1 and ddy == 0:
+			g[r1 + 1][c1 - 2] = "[dim]--[/dim]"
+		elif ddx == 1 and ddy == -1:
+			g[r1 - 1][c1 + 4] = "[dim]/[/dim]"
+		elif ddx == -1 and ddy == -1:
+			g[r1 - 1][c1 - 1] = "[dim]\\[/dim]"
+		elif ddx == 1 and ddy == 1:
+			g[r1 + 3][c1 + 4] = "[dim]\\[/dim]"
+		elif ddx == -1 and ddy == 1:
+			g[r1 + 3][c1 - 1] = "[dim]/[/dim]"

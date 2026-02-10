@@ -10,34 +10,26 @@ from rich.layout import Layout
 from rich.text import Text
 
 from Objects.character import Class
-from UI.panels import make_writing_interface
+from UI.panels import CommandInputPanel
+from UI.viewsClass import View
 
 
-class CharacterCreationUI:
+class CharacterCreationUI(View):
 	"""Step-by-step character creation screen."""
 
 	STEPS = ("name", "class", "confirm")
 
-	def __init__(self):
-		self.running: bool = True
-		self.input_buffer: str = ""
+	def __init__(self) -> None:
+		super().__init__()
 		self.character_name: str = ""
 		self.character_class: str = ""
 		self.step: str = "name"
 		self.error: str = ""
-		self.game_ui = None  # set on confirm — delegates everything after
 
-	# -- input handling (called from input_handler on Enter) ---------------
+	# -- input handling (called from View.handle_input) --------------------
 
-	def handle_input(self, text: str) -> None:
+	def _handle_input(self, text: str) -> None:
 		"""Route submitted text to the handler for the current step."""
-		if self.game_ui is not None:
-			# Already transitioned — forward to the game UI
-			from UI.commands import dispatch
-
-			dispatch(self.game_ui, text)
-			return
-
 		text = text.strip()
 		if not text:
 			return
@@ -67,27 +59,30 @@ class CharacterCreationUI:
 		self.error = ""
 		self.step = "confirm"
 
-	def _transition_to_game(self) -> None:
-		"""Create the game UI and switch over."""
-		from UI.in_game_ui.gameUI import GameUI
-		from World.demoArea import START_ROOM
-
-		self.game_ui = GameUI(START_ROOM)
-		# Sync shared state so the main loop keeps working
-		self.running = self.game_ui.running
-
 	def _handle_confirm(self, text: str) -> None:
 		answer = text.lower()
 		if answer in ("y", "yes"):
-			self._transition_to_game()
+			from UI.in_game_ui.gameUI import GameUI
+			from World.demoArea import START_ROOM
+
+			self.transition_to(GameUI, START_ROOM)
 		elif answer in ("n", "no"):
-			# Reset and start over
 			self.character_name = ""
 			self.character_class = ""
 			self.error = ""
 			self.step = "name"
 		else:
 			self.error = "Please type yes or no."
+
+	# -- tab completion ----------------------------------------------------
+
+	def _get_tab_candidates(self, partial: str) -> list[str]:
+		"""Return completion candidates based on the current step."""
+		if self.step == "class":
+			return [c.name.capitalize() for c in Class if c.name.lower().startswith(partial)]
+		if self.step == "confirm":
+			return [w for w in ("yes", "no") if w.startswith(partial)]
+		return []
 
 	# -- layout ------------------------------------------------------------
 
@@ -98,20 +93,14 @@ class CharacterCreationUI:
 		if self.step == "class":
 			classes = ", ".join(c.name.capitalize() for c in Class)
 			return f"Choose a class ({classes}):"
-		# confirm
 		return (
 			f"Name:  [bold]{self.character_name}[/bold]\n"
 			f"Class: [bold]{self.character_class.name.capitalize()}[/bold]\n\n"
 			"Is this correct? (yes / no)"
 		)
 
-	def build_layout(self) -> Layout:
-		"""Build the Rich layout — delegates to GameUI after transition."""
-		if self.game_ui is not None:
-			# Keep running flag in sync so the main loop can exit
-			self.running = self.game_ui.running
-			return self.game_ui.build_layout()
-
+	def _build_layout(self) -> Layout:
+		"""Build the Rich layout for the character creation screen."""
 		layout = Layout()
 		layout.split_column(
 			Layout(name="header", size=3),
@@ -126,5 +115,5 @@ class CharacterCreationUI:
 			body_parts.append(f"\n[red]{self.error}[/red]")
 		layout["body"].update(Text.from_markup("\n".join(body_parts)))
 
-		layout["footer"].update(make_writing_interface(self))
+		layout["footer"].update(CommandInputPanel(self.input_buffer).build())
 		return layout

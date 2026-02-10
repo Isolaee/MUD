@@ -1,14 +1,13 @@
-"""
-MUD Game — application entry point.
+"""MUD Game — application entry point.
 
-Connects the UI to the world by loading the demo area
-and launching the TUI.
+Launches the TUI starting with the character creation screen.
 
 Run: python app.py
 """
 
-from UI.game_ui import main as start_ui
-from World.demoArea import START_ROOM  ## Delete afte implaementing character creation
+from UI.app_engine import Application
+from UI.characterCreation.characterCreation_ui import CharacterCreationUI
 
 if __name__ == "__main__":
-	start_ui(START_ROOM)
+	app = Application(CharacterCreationUI())
+	app.run()
