@@ -74,6 +74,16 @@ class CharacterCreationUI(View):
 		else:
 			self.error = "Please type yes or no."
 
+	# -- tab completion ----------------------------------------------------
+
+	def _get_tab_candidates(self, partial: str) -> list[str]:
+		"""Return completion candidates based on the current step."""
+		if self.step == "class":
+			return [c.name.capitalize() for c in Class if c.name.lower().startswith(partial)]
+		if self.step == "confirm":
+			return [w for w in ("yes", "no") if w.startswith(partial)]
+		return []
+
 	# -- layout ------------------------------------------------------------
 
 	def _prompt_text(self) -> str:

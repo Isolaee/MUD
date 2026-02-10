@@ -16,8 +16,6 @@ import threading
 import time
 from typing import TYPE_CHECKING
 
-from UI.tab_completion import TabCompleter
-
 if TYPE_CHECKING:
 	from UI.viewsClass import View
 
@@ -29,7 +27,6 @@ class InputHandler:
 
 	def __init__(self, view: View) -> None:
 		self._view = view
-		self._completer = TabCompleter()
 		self._thread: threading.Thread | None = None
 
 	def start(self) -> None:
@@ -69,10 +66,9 @@ class InputHandler:
 					active = self._get_active_view()
 					active.input_buffer = active.input_buffer[:-1]
 				elif ch == "\t":
-					# Tab completion (only on views that support it)
+					# Tab completion — delegated to the active view
 					active = self._get_active_view()
-					if hasattr(active, "completion_state"):
-						self._completer.complete(active)
+					active.handle_tab()
 				elif ch == "\x1b":
 					pass
 				elif ch in ("\x00", "\xe0"):
