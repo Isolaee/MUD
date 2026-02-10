@@ -37,7 +37,10 @@ def input_loop(ui: GameUI) -> None:
 			ch = msvcrt.getwch()
 			if ch == "\r":
 				# Enter — submit the command
-				dispatch(ui, ui.input_buffer)
+				if hasattr(ui, "handle_input"):
+					ui.handle_input(ui.input_buffer)
+				else:
+					dispatch(ui, ui.input_buffer)
 				ui.input_buffer = ""
 			elif ch == "\x08":
 				# Backspace — remove last character
