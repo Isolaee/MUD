@@ -37,6 +37,7 @@ class CommandDispatcher:
 
 		if result.new_room is not None:
 			ui.current_room = result.new_room
+			ui.visited_rooms.add(result.new_room)
 
 		if result.quit:
 			ui.running = False

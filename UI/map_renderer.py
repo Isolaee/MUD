@@ -1,17 +1,12 @@
-"""BFS room traversal and ASCII map rendering.
+"""BFS room traversal and simple ASCII map rendering.
 
-Generates a small overhead map of the rooms surrounding the player.
-The algorithm:
+Generates an overhead map of all rooms in the connected area.
 
-1. **BFS discovery** — walk the room graph up to *MAX_DEPTH* hops,
-   assigning each room a (dx, dy) grid position.
-2. **Grid placement** — each room is drawn as a 3-line ASCII box
-   on a fixed character grid.
-3. **Path drawing** — connections between adjacent rooms are rendered
-   with ``|``, ``--``, ``/``, or ``\\`` characters.
-
-The current room is highlighted with ``@@`` in bold yellow; other
-rooms are shown in cyan with the first two letters of their name.
+Symbols:
+- ``@`` — current room
+- ``#`` — visited room
+- ``O`` — unvisited room
+- ``-``, ``|``, ``/``, ``\\`` — connections
 """
 
 from __future__ import annotations
@@ -26,32 +21,54 @@ from Objects.room import Room, DIR_VECTOR
 
 
 class MapRenderer:
-	"""BFS-based ASCII map renderer."""
+	"""BFS-based ASCII map renderer using simple symbols."""
 
-	GRID_WIDTH = 30
-	GRID_HEIGHT = 19
-	MAX_DEPTH = 2
+	# Spacing between room centres on the character grid.
+	_COL_SPACING = 4
+	_ROW_SPACING = 2
 
-	def __init__(self, current_room: Room) -> None:
+	def __init__(self, current_room: Room, visited_rooms: set[Room]) -> None:
 		self._room = current_room
+		self._visited = visited_rooms
 
 	def build(self) -> Panel:
-		"""Build the ASCII map panel showing nearby rooms and connections."""
+		"""Build the ASCII map panel showing all rooms in the area."""
 		positions, edges = self._bfs_rooms()
-		g = [[" "] * self.GRID_WIDTH for _ in range(self.GRID_HEIGHT)]
 
-		# Draw room boxes
-		for room, (dx, dy) in positions.items():
-			col, row = self._grid_pos(dx, dy)
-			if room == self._room:
-				self._place_box(g, col, row, "@@", "bold yellow")
-			else:
-				self._place_box(g, col, row, room.name, "cyan")
+		# Determine grid bounds and compute offset to centre the map.
+		if not positions:
+			return self._empty_panel()
 
-		# Draw connection paths
+		min_dx = min(dx for dx, _ in positions.values())
+		max_dx = max(dx for dx, _ in positions.values())
+		min_dy = min(dy for _, dy in positions.values())
+		max_dy = max(dy for _, dy in positions.values())
+
+		# Character-grid sized to fit the rooms exactly.
+		g_cols = (max_dx - min_dx) * self._COL_SPACING + 1
+		g_rows = (max_dy - min_dy) * self._ROW_SPACING + 1
+		g = [[" "] * g_cols for _ in range(g_rows)]
+
+		# Offset so that min_dx/min_dy maps to column/row 0.
+		off_col = -min_dx * self._COL_SPACING
+		off_row = -min_dy * self._ROW_SPACING
+
+		# Draw connections first (so room symbols overwrite if overlapping).
 		for edge in edges:
 			p1, p2 = tuple(edge)
-			self._draw_path(g, p1, p2)
+			self._draw_connection(g, p1, p2, off_col, off_row)
+
+		# Draw room symbols.
+		for room, (dx, dy) in positions.items():
+			col = dx * self._COL_SPACING + off_col
+			row = dy * self._ROW_SPACING + off_row
+			if 0 <= row < len(g) and 0 <= col < len(g[0]):
+				if room is self._room:
+					g[row][col] = "[bold yellow]@[/bold yellow]"
+				elif room in self._visited:
+					g[row][col] = "[cyan]#[/cyan]"
+				else:
+					g[row][col] = "[dim]O[/dim]"
 
 		out = "\n".join("".join(row) for row in g)
 		return Panel(
@@ -61,84 +78,98 @@ class MapRenderer:
 			box=box.ROUNDED,
 		)
 
+	# ------------------------------------------------------------------
+	# BFS discovery
+	# ------------------------------------------------------------------
+
 	def _bfs_rooms(self):
-		"""Discover rooms reachable within MAX_DEPTH hops via BFS.
+		"""Discover all rooms reachable from the current room.
 
 		Returns:
-			positions: dict mapping Room -> (dx, dy) grid coordinate.
+			positions: dict mapping Room -> (dx, dy) logical coordinate.
 			edges: set of frozenset pairs representing connections to draw.
 		"""
-		positions = {self._room: (0, 0)}
-		occupied = {(0, 0): self._room}
-		edges: set = set()
-		queue = deque([(self._room, 0)])
-		visited = {self._room}
+		positions: dict[Room, tuple[int, int]] = {self._room: (0, 0)}
+		occupied: dict[tuple[int, int], Room] = {(0, 0): self._room}
+		edges: set[frozenset] = set()
+		queue: deque[Room] = deque([self._room])
+		seen: set[Room] = {self._room}
 
 		while queue:
-			room, depth = queue.popleft()
+			room = queue.popleft()
 			room_pos = positions[room]
-			if depth >= self.MAX_DEPTH:
-				continue
 			for d, neighbor in room.connected_rooms.items():
 				dx, dy = DIR_VECTOR[d]
 				npos = (room_pos[0] + dx, room_pos[1] + dy)
+
 				if neighbor not in positions:
-					if abs(npos[0]) > 2 or abs(npos[1]) > 2:
-						continue
 					if npos in occupied:
 						continue
 					positions[neighbor] = npos
 					occupied[npos] = neighbor
-				p1 = positions[room]
+
 				p2 = positions.get(neighbor)
 				if p2 is not None:
-					edges.add(frozenset((p1, p2)))
-				if neighbor not in visited:
-					visited.add(neighbor)
-					queue.append((neighbor, depth + 1))
+					edges.add(frozenset((room_pos, p2)))
+
+				if neighbor not in seen:
+					seen.add(neighbor)
+					queue.append(neighbor)
 
 		return positions, edges
 
-	@staticmethod
-	def _grid_pos(dx, dy):
-		"""Convert a room grid coordinate (dx, dy) to character-grid (col, row)."""
-		col = (dx + 2) * 6
-		row = (dy + 2) * 4
-		return col, row
+	# ------------------------------------------------------------------
+	# Connection drawing
+	# ------------------------------------------------------------------
 
-	@staticmethod
-	def _place_box(g, col, row, label, style):
-		"""Draw a 3-line ASCII room box at (col, row) on the character grid."""
-		s, e = f"[{style}]", f"[/{style}]"
-		g[row][col] = f"{s}+--+{e}"
-		g[row + 1][col] = f"{s}|{e}{label[:2]}{s}|{e}"
-		g[row + 2][col] = f"{s}+--+{e}"
-		for r in range(row, row + 3):
-			for c in range(col + 1, col + 4):
-				if c < len(g[0]):
-					g[r][c] = ""
-
-	@staticmethod
-	def _draw_path(g, p1, p2):
-		"""Draw a connector character between two adjacent room positions."""
+	def _draw_connection(self, g, p1, p2, off_col, off_row):
+		"""Draw a connector between two logically adjacent rooms."""
 		ddx = p2[0] - p1[0]
 		ddy = p2[1] - p1[1]
 		if abs(ddx) > 1 or abs(ddy) > 1:
 			return
-		c1, r1 = MapRenderer._grid_pos(*p1)
+
+		c1 = p1[0] * self._COL_SPACING + off_col
+		r1 = p1[1] * self._ROW_SPACING + off_row
+
+		def _put(r, c, ch):
+			if 0 <= r < len(g) and 0 <= c < len(g[0]):
+				g[r][c] = f"[dim]{ch}[/dim]"
+
 		if ddx == 0 and ddy == -1:
-			g[r1 - 1][c1 + 1] = "[dim]|[/dim]"
+			# North: vertical connector above
+			_put(r1 - 1, c1, "|")
 		elif ddx == 0 and ddy == 1:
-			g[r1 + 3][c1 + 1] = "[dim]|[/dim]"
+			# South: vertical connector below
+			_put(r1 + 1, c1, "|")
 		elif ddx == 1 and ddy == 0:
-			g[r1 + 1][c1 + 4] = "[dim]--[/dim]"
+			# East: horizontal connectors
+			for i in range(1, self._COL_SPACING):
+				_put(r1, c1 + i, "-")
 		elif ddx == -1 and ddy == 0:
-			g[r1 + 1][c1 - 2] = "[dim]--[/dim]"
+			# West: horizontal connectors
+			for i in range(1, self._COL_SPACING):
+				_put(r1, c1 - i, "-")
 		elif ddx == 1 and ddy == -1:
-			g[r1 - 1][c1 + 4] = "[dim]/[/dim]"
+			# North-east: diagonal
+			_put(r1 - 1, c1 + 1, "/")
 		elif ddx == -1 and ddy == -1:
-			g[r1 - 1][c1 - 1] = "[dim]\\[/dim]"
+			# North-west: diagonal
+			_put(r1 - 1, c1 - 1, "\\")
 		elif ddx == 1 and ddy == 1:
-			g[r1 + 3][c1 + 4] = "[dim]\\[/dim]"
+			# South-east: diagonal
+			_put(r1 + 1, c1 + 1, "\\")
 		elif ddx == -1 and ddy == 1:
-			g[r1 + 3][c1 - 1] = "[dim]/[/dim]"
+			# South-west: diagonal
+			_put(r1 + 1, c1 - 1, "/")
+
+	# ------------------------------------------------------------------
+
+	@staticmethod
+	def _empty_panel() -> Panel:
+		return Panel(
+			Text("No map data."),
+			title="[bold]Map[/bold]",
+			border_style="yellow",
+			box=box.ROUNDED,
+		)

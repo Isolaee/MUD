@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING
 from Objects.game_object import GameObject
 
 if TYPE_CHECKING:
+	from Objects.room import Room
 	from Quests.quest import Quest
 
 
@@ -82,6 +83,15 @@ class PlayerCharacter(Character):
 		self.race = race
 		self.size = characterSize
 		self.inventory = inventory
+		self.visited_rooms: set[Room] = set()
+
+	def visit_room(self, room: Room) -> None:
+		"""Mark a room as visited."""
+		self.visited_rooms.add(room)
+
+	def has_visited(self, room: Room) -> bool:
+		"""Check whether the player has visited a room."""
+		return room in self.visited_rooms
 
 	def object_type(self) -> CharacterType:
 		return CharacterType.PLAYER
