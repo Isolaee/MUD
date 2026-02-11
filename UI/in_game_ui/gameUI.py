@@ -48,6 +48,7 @@ class GameUI(View):
 	def __init__(self, starting_room: Room) -> None:
 		super().__init__()
 		self.current_room: Room = starting_room
+		self.visited_rooms: set[Room] = {starting_room}
 		self.event_history: list[str] = [
 			"[dim]Welcome to the MUD! Type [bold]help[/bold] for commands.[/dim]",
 		]
@@ -204,7 +205,7 @@ class GameUI(View):
 		layout["left"].update(EventHistoryPanel(self.event_history).build())
 		layout["current_events"].update(CurrentEventsPanel(self.current_room).build())
 		layout["writing"].update(CommandInputPanel(self.input_buffer).build())
-		layout["map"].update(MapRenderer(self.current_room).build())
+		layout["map"].update(MapRenderer(self.current_room, self.visited_rooms).build())
 		layout["stats"].update(StatsPanel().build())
 		layout["inventory"].update(InventoryPanel(self.current_room.present_items).build())
 
