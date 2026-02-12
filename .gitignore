@@ -30,6 +30,11 @@ build/
 .env
 .env.local
 
+# SSH host keys (never commit private keys)
+server/host_key
+server/host_key.pub
+*.pem
+
 # OS files
 .DS_Store
 Thumbs.db
