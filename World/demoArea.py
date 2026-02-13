@@ -13,9 +13,10 @@ Room layout::
       +----------------------------+
 """
 
-from Objects.character import NonPlayerCharacter, Race, CharacterSize
+from Objects.Characters.character import NonPlayerCharacter, Race
+from Objects.Characters.characterRaces import CharacterSize
 from Objects.Items.Swords.shortSword import ShortSword
-from Objects.room import Room, Description, Direction
+from Objects.Rooms.room import Room, Description, Direction
 from Quests.demoQuest import DemoQuest
 from World.FirstTown import introTown
 

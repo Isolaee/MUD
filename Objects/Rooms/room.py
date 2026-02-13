@@ -16,8 +16,8 @@ from typing import TYPE_CHECKING
 from Objects.game_object import GameObject
 
 if TYPE_CHECKING:
-	from Objects.character import Character
-	from Objects.item import Item
+	from Objects.Characters.character import Character
+	from Objects.Items.item import Item
 
 
 class Direction(Enum):

@@ -10,7 +10,7 @@ from __future__ import annotations
 from abc import ABC
 from enum import Enum, auto
 
-from Objects.item import Item, ItemType
+from Objects.Items.item import Item, ItemType
 
 
 class DamageType(Enum):
