@@ -14,10 +14,12 @@ from abc import ABC
 from enum import Enum, auto
 from typing import TYPE_CHECKING
 
+from Objects.Characters.characterClasses import get_all_classes
+from Objects.Characters.characterRaces import CharacterSize, get_all_races
 from Objects.game_object import GameObject
 
 if TYPE_CHECKING:
-	from Objects.room import Room
+	from Objects.Rooms.room import Room
 	from Quests.quest import Quest
 
 
@@ -26,27 +28,17 @@ class CharacterType(Enum):
 	NPC = auto()
 
 
-class Race(Enum):
-	HUMAN = auto()
-	ELF = auto()
-	ORC = auto()
-	GNOME = auto()
+CharacterRaceOptions = Enum(
+	"CharacterRaceOptions",
+	{name: auto() for name in get_all_races()},
+)
 
 
-class Class(Enum):
-	WARRIOR = auto()
-	MAGE = auto()
-	ROGUE = auto()
-	CLERIC = auto()
-
-
-class CharacterSize(Enum):
-	MINIATURE = auto()  # Doll size, tiny creatures
-	SMALL = auto()  # Gnomes, halflings and goblins
-	MEDIUM = auto()  # Humans, elves, orcs and most common creatures
-	LARGE = auto()  # Ogres, trolls. Size is about a elephant
-	HUGE = auto()  # Giants, dragons and other huge creatures. Real life size is about a house
-	HUMONGOUS = auto()  # Titans,  other humongous creatures. Real life size is about a castle or a mountain
+# Auto-generated from CharacterClass subclasses in characterClasses.py
+CharacterClassOptions = Enum(
+	"CharacterClassOptions",
+	{name: auto() for name in get_all_classes()},
+)
 
 
 class Character(GameObject, ABC):
@@ -71,7 +63,8 @@ class PlayerCharacter(Character):
 		current_hp: int,
 		current_stamina: int,
 		base_attack: int,
-		race: Race,
+		race: CharacterRaceOptions,
+		character_class: CharacterClassOptions,
 		characterSize: CharacterSize,
 		inventory: list,
 		**kwargs,
@@ -81,9 +74,38 @@ class PlayerCharacter(Character):
 		self.stamina = current_stamina
 		self.base_attack = base_attack  # Do we want to derive base attack value from race? Base attack would not be defined on creation but calculated on demand based on race, size and items.
 		self.race = race
+		self.character_class = character_class
 		self.size = characterSize
 		self.inventory = inventory
 		self.visited_rooms: set[Room] = set()
+
+	def create_character(
+		self, name: str, race: CharacterRaceOptions, character_class: CharacterClassOptions
+	) -> Character:
+		"""Create a new character with the given parameters.
+
+		Base stats are adjusted additively by the chosen character class modifiers.
+		"""
+		# Resolve class and race instances for their modifiers
+		class_instance = get_all_classes()[character_class.name]()
+		race_instance = get_all_races()[race.name]()
+		class_mods = class_instance.stat_modifiers
+		race_mods = race_instance.stat_modifiers
+
+		base_hp = 100
+		base_stamina = 100
+		base_attack = 10
+
+		return PlayerCharacter(
+			current_hp=base_hp + class_mods.hp + race_mods.hp,
+			current_stamina=base_stamina + class_mods.stamina + race_mods.stamina,
+			base_attack=base_attack + class_mods.attack + race_mods.attack,
+			race=race,
+			character_class=character_class,
+			characterSize=race_instance.size,
+			inventory=[],
+			name=name,
+		)
 
 	def visit_room(self, room: Room) -> None:
 		"""Mark a room as visited."""

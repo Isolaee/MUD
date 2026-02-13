@@ -4,7 +4,7 @@ Currently contains a single town-square room.  Additional buildings,
 NPCs, and shops will be added here as the game grows.
 """
 
-from Objects.room import Room, Description
+from Objects.Rooms.room import Room, Description
 
 square = Room("Town square")
 square.description = Description(

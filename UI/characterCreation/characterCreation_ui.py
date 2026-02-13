@@ -9,7 +9,7 @@ Steps: name -> class -> confirm
 from rich.layout import Layout
 from rich.text import Text
 
-from Objects.character import Class
+from Objects.Characters.character import Class
 from UI.panels import CommandInputPanel
 from UI.viewsClass import View
 

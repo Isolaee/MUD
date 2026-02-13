@@ -15,8 +15,8 @@ from rich.table import Table
 from rich.text import Text
 
 if TYPE_CHECKING:
-	from Objects.item import Item
-	from Objects.room import Room
+	from Objects.Items.item import Item
+	from Objects.Rooms.room import Room
 
 
 class EventHistoryPanel:

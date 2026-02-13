@@ -11,7 +11,7 @@ from abc import ABC
 from enum import Enum, auto
 
 from Objects.game_object import GameObject
-from Objects.room import Description
+from Objects.Rooms.room import Description
 from Quests.objective import Objective
 from Quests.reward import Reward
 

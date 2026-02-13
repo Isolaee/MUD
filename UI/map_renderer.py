@@ -17,7 +17,7 @@ from rich import box
 from rich.panel import Panel
 from rich.text import Text
 
-from Objects.room import Room, DIR_VECTOR
+from Objects.Rooms.room import Room, DIR_VECTOR
 
 
 class MapRenderer:

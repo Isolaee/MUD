@@ -16,7 +16,7 @@ Layout structure::
 
 from rich.layout import Layout
 
-from Objects.room import Room
+from Objects.Rooms.room import Room
 from UI.commands import CommandDispatcher
 from UI.map_renderer import MapRenderer
 from UI.panels import (

@@ -1,6 +1,6 @@
 """Demo quest — a simple 'talk to NPC again' quest for testing."""
 
-from Objects.room import Description
+from Objects.Rooms.room import Description
 from Quests.objective import Objective, ObjectiveType
 from Quests.quest import Quest
 from Quests.reward import Reward, RewardType

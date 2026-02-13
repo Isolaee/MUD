@@ -19,8 +19,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum, auto
 
-from Objects.character import NonPlayerCharacter
-from Objects.room import Room
+from Objects.Characters.character import NonPlayerCharacter
+from Objects.Rooms.room import Room
 
 # Maps alias -> canonical command name.
 # Canonical commands map to themselves implicitly.
