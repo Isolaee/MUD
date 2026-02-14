@@ -84,8 +84,9 @@ class CommandInputPanel:
 class StatsPanel:
 	"""Character stats panel wired to a PlayerCharacter."""
 
-	def __init__(self, player: PlayerCharacter | None = None) -> None:
+	def __init__(self, player: PlayerCharacter | None = None, in_combat: bool = False) -> None:
 		self._player = player
+		self._in_combat = in_combat
 
 	def build(self) -> Panel:
 		table = Table(show_header=False, box=None, padding=(0, 1))
@@ -98,6 +99,10 @@ class StatsPanel:
 			table.add_row("ATK", str(p.base_attack))
 			table.add_row("Class", p.character_class.name.capitalize())
 			table.add_row("Race", p.race.name.capitalize())
+			if self._in_combat:
+				table.add_row("", "[bold red]IN COMBAT[/bold red]")
+			elif p.is_knocked_out:
+				table.add_row("", "[bold red]KNOCKED OUT[/bold red]")
 		else:
 			table.add_row("[dim]No character[/dim]", "")
 		return Panel(
