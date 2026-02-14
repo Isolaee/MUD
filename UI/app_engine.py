@@ -38,6 +38,7 @@ class Application:
 			console=self._console,
 			refresh_per_second=self.FPS,
 			screen=True,
+			vertical_overflow="crop",
 		) as live:
 			while self._view.running:
 				live.update(self._view.build_layout())

@@ -81,10 +81,10 @@ class SSHGameSession:
 
 		layout = self.view.build_layout()
 
-		# Build ConsoleOptions with the exact terminal height.
-		# This is what Live(screen=True) does internally — without it,
-		# Layout collapses to minimum content height.
-		options = console.options.update_height(height)
+		# Build ConsoleOptions with terminal height minus one row.
+		# The rendered string ends with a newline, which would push
+		# the first row off-screen when written after \033[H].
+		options = console.options.update_height(height - 1)
 		segments = console.render(layout, options)
 		lines = console._render_buffer(segments)
 		return lines
