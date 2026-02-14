@@ -11,10 +11,13 @@ from __future__ import annotations
 
 import re
 import sqlite3
+from pathlib import Path
 from typing import TYPE_CHECKING
 
+from rich.align import Align
 from rich.layout import Layout
 from rich.text import Text
+from rich_pixels import Pixels
 
 from UI.panels import CommandInputPanel
 from UI.viewsClass import View
@@ -26,6 +29,10 @@ if TYPE_CHECKING:
 MIN_USERNAME_LEN = 3
 MIN_PASSWORD_LEN = 6
 USERNAME_PATTERN = re.compile(r"^[a-zA-Z0-9_]+$")
+
+_ASSETS = Path(__file__).resolve().parent.parent / "assets"
+MAGE_ART = Pixels.from_image_path(_ASSETS / "Placeholder_mage.png", resize=(18, 14))
+WARRIOR_ART = Pixels.from_image_path(_ASSETS / "Placeholder_warrior.png", resize=(18, 14))
 
 
 class LoginUI(View):
@@ -61,16 +68,18 @@ class LoginUI(View):
 			handler(text)
 
 	def _handle_menu(self, text: str) -> None:
-		if text == "1":
+		if text.lower() == "login" or text.lower() == "log-in" or text == "1":
 			self.step = "login_username"
 			self.error = ""
 			self.info = ""
-		elif text == "2":
+		elif text.lower() == "register" or text == "2":
 			self.step = "register_username"
 			self.error = ""
 			self.info = ""
+		elif text.lower() == "quit" or text == "3":
+			self.process.exit(0)
 		else:
-			self.error = "Please type 1 or 2."
+			self.error = "Please type Login, Register, or Quit."
 
 	# -- login flow -----------------------------------------------------------
 
@@ -159,9 +168,9 @@ class LoginUI(View):
 		if self.step == "menu":
 			return (
 				"[bold]Welcome to the MUD![/bold]\n\n"
-				"  [cyan]1)[/cyan] Login\n"
-				"  [cyan]2)[/cyan] Create Account\n\n"
-				"Choose an option:"
+				"  [cyan]Login[/cyan]\n\n"
+				"  [cyan]Create Account[/cyan]\n\n"
+				"  [cyan]Quit[/cyan]"
 			)
 		if self.step == "login_username":
 			return "Username:"
@@ -185,12 +194,25 @@ class LoginUI(View):
 
 		layout["header"].update("[bold]MUD Login[/bold]")
 
+		layout["body"].split_row(
+			Layout(name="left_pad", ratio=1),
+			Layout(name="left_art", size=20),
+			Layout(name="main", size=30),
+			Layout(name="right_art", size=20),
+			Layout(name="right_pad", ratio=1),
+		)
+
+		layout["left_pad"].update("")
+		layout["right_pad"].update("")
+		layout["left_art"].update(Align.right(MAGE_ART, vertical="middle"))
+		layout["right_art"].update(Align.left(WARRIOR_ART, vertical="middle"))
+
 		body_parts = [self._prompt_text()]
 		if self.error:
 			body_parts.append(f"\n[red]{self.error}[/red]")
 		if self.info:
 			body_parts.append(f"\n[green]{self.info}[/green]")
-		layout["body"].update(Text.from_markup("\n".join(body_parts)))
+		layout["main"].update(Align.center(Text.from_markup("\n".join(body_parts)), vertical="middle"))
 
 		# Mask password input
 		if self.step in ("login_password", "register_password", "register_confirm"):
