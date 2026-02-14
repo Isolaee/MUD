@@ -29,7 +29,8 @@ from UI.panels import (
 	CoreStatsPanel,
 	CurrentEventsPanel,
 	EventHistoryPanel,
-	InventoryPanel,
+	RoomCharactersPanel,
+	RoomChat,
 	StatsPanel,
 )
 from UI.viewsClass import View
@@ -70,10 +71,17 @@ class GameUI(View):
 		self.event_history: list[str] = [
 			"[dim]Welcome to the MUD! Type [bold]help[/bold] for commands.[/dim]",
 		]
+		self.room_chat: list[str] = []
 		self._dispatcher = CommandDispatcher()
 
 		# Register with the shared world
-		world_manager.join(character_id, player, self.current_room, self._receive_event)
+		world_manager.join(
+			character_id,
+			player,
+			self.current_room,
+			self._receive_event,
+			self._receive_chat,
+		)
 
 		# Show the starting room description immediately
 		self._dispatcher.dispatch(self, "look")
@@ -81,6 +89,10 @@ class GameUI(View):
 	def _receive_event(self, message: str) -> None:
 		"""Callback invoked by WorldManager to push events into this session."""
 		self.event_history.append(message)
+
+	def _receive_chat(self, message: str) -> None:
+		"""Callback invoked by WorldManager to push chat messages into this session."""
+		self.room_chat.append(message)
 
 	def _handle_input(self, text: str) -> None:
 		"""Dispatch command through the command dispatcher."""
@@ -157,6 +169,11 @@ class GameUI(View):
 			Layout(name="middle", ratio=3),
 			Layout(name="right", ratio=1),
 		)
+
+		layout["left"].split_column(
+			Layout(name="chat", ratio=1),
+			Layout(name="events", ratio=1),
+		)
 		layout["middle"].split_column(
 			Layout(name="current_events", ratio=1),
 			Layout(name="Core-stats", size=3),  ## hp and secondary resource bar (mana/stamina)
@@ -165,16 +182,17 @@ class GameUI(View):
 		layout["right"].split_column(
 			Layout(name="map", ratio=1),
 			Layout(name="stats", ratio=1),
-			Layout(name="inventory", ratio=1),
+			Layout(name="room_characters", ratio=1),
 		)
 
-		layout["left"].update(EventHistoryPanel(self.event_history).build())
+		layout["chat"].update(RoomChat(self.room_chat, visible_count=5).build())
+		layout["events"].update(EventHistoryPanel(self.event_history).build())
 		layout["current_events"].update(CurrentEventsPanel(self.current_room).build())
 		layout["Core-stats"].update(CoreStatsPanel(self.player).build())
 		layout["writing"].update(CommandInputPanel(self.input_buffer).build())
 		layout["map"].update(MapRenderer(self.current_room, self.visited_rooms).build())
 		in_combat = self.world_manager.combat_manager.is_in_combat(self.character_id)
 		layout["stats"].update(StatsPanel(self.player, in_combat=in_combat).build())
-		layout["inventory"].update(InventoryPanel(self.player.inventory).build())
+		layout["room_characters"].update(RoomCharactersPanel(self.current_room).build())
 
 		return layout

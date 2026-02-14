@@ -32,6 +32,7 @@ class GameSession:
 	player: PlayerCharacter
 	room: Room
 	event_callback: Callable[[str], None]
+	chat_callback: Callable[[str], None] | None = None
 
 
 class WorldManager:
@@ -81,6 +82,7 @@ class WorldManager:
 		player: PlayerCharacter,
 		room: Room,
 		event_callback: Callable[[str], None],
+		chat_callback: Callable[[str], None] | None = None,
 	) -> None:
 		"""Register a player entering the world."""
 		session = GameSession(
@@ -88,6 +90,7 @@ class WorldManager:
 			player=player,
 			room=room,
 			event_callback=event_callback,
+			chat_callback=chat_callback,
 		)
 		self.sessions[character_id] = session
 		room.present_players.append(player)
@@ -161,6 +164,13 @@ class WorldManager:
 		for session in self.sessions.values():
 			if session.room is room and session.character_id != exclude:
 				session.event_callback(message)
+
+	def broadcast_chat_to_room(self, room: Room, message: str, exclude: int | None = None) -> None:
+		"""Send a chat message to all players in a room, optionally excluding one."""
+		for session in self.sessions.values():
+			if session.room is room and session.character_id != exclude:
+				if session.chat_callback is not None:
+					session.chat_callback(message)
 
 	# -- atomic actions -------------------------------------------------------
 

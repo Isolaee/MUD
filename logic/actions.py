@@ -63,6 +63,7 @@ _CANONICAL_COMMANDS: dict[str, str | None] = {
 	"decline": None,
 	"leave-party": None,
 	"party": None,
+	"chat": None,
 	"defend": None,
 	"flee": None,
 	"login": None,
@@ -93,6 +94,7 @@ class Action(Enum):
 	DECLINE = auto()
 	LEAVE_PARTY = auto()
 	PARTY = auto()
+	CHAT = auto()
 	HELP = auto()
 	QUIT = auto()
 
@@ -170,6 +172,9 @@ def parse(raw: str, current_room: Room) -> tuple[Action, list]:
 		target = _resolve_character_target(arg, current_room)
 		return Action.TALK_TO, [target]
 
+	if verb == "chat":
+		return Action.CHAT, [arg]
+
 	if verb == "move" and arg:
 		target = _resolve_move_target(arg, current_room)
 		return Action.MOVE, [target]
@@ -190,7 +195,8 @@ def execute(action: Action, inputs: list, current_room: Room) -> ActionResult:
 		Action.TALK_TO: _exec_talk_to,
 		Action.HELP: _exec_help,
 		Action.QUIT: _exec_quit,
-		# Party commands return empty results; handled by CommandDispatcher
+		# Chat and party commands return empty results; handled by CommandDispatcher
+		Action.CHAT: _exec_noop,
 		Action.INVITE: _exec_noop,
 		Action.ACCEPT: _exec_noop,
 		Action.DECLINE: _exec_noop,
