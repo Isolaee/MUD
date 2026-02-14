@@ -36,6 +36,11 @@ class CommandDispatcher:
 		ui.event_history.extend(result.messages)
 
 		if result.new_room is not None:
+			# Route through WorldManager for multiplayer broadcasting
+			world = getattr(ui, "world_manager", None)
+			char_id = getattr(ui, "character_id", None)
+			if world is not None and char_id is not None:
+				world.move_player(char_id, result.new_room)
 			ui.current_room = result.new_room
 			ui.visited_rooms.add(result.new_room)
 

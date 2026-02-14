@@ -15,6 +15,7 @@ from rich.table import Table
 from rich.text import Text
 
 if TYPE_CHECKING:
+	from Objects.Characters.character import PlayerCharacter
 	from Objects.Items.item import Item
 	from Objects.Rooms.room import Room
 
@@ -81,22 +82,24 @@ class CommandInputPanel:
 
 
 class StatsPanel:
-	"""Character stats (placeholder with hardcoded values).
+	"""Character stats panel wired to a PlayerCharacter."""
 
-	TODO: Wire up to a real PlayerCharacter once stats are implemented.
-	"""
+	def __init__(self, player: PlayerCharacter | None = None) -> None:
+		self._player = player
 
 	def build(self) -> Panel:
 		table = Table(show_header=False, box=None, padding=(0, 1))
 		table.add_column("stats", style="bold")
 		table.add_column("value", justify="right")
-		table.add_row("HP", "[red]45[/red] / 60")
-		table.add_row("MP", "[blue]20[/blue] / 20")
-		table.add_row("STR", "14")
-		table.add_row("DEX", "12")
-		table.add_row("INT", "10")
-		table.add_row("Level", "[bold]3[/bold]")
-		table.add_row("XP", "230 / 500")
+		if self._player is not None:
+			p = self._player
+			table.add_row("HP", f"[red]{p.hp}[/red]")
+			table.add_row("STM", f"[blue]{p.stamina}[/blue]")
+			table.add_row("ATK", str(p.base_attack))
+			table.add_row("Class", p.character_class.name.capitalize())
+			table.add_row("Race", p.race.name.capitalize())
+		else:
+			table.add_row("[dim]No character[/dim]", "")
 		return Panel(
 			table,
 			title="[bold]Character Stats[/bold]",
