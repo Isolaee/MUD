@@ -124,13 +124,13 @@ class TestParse:
 
 	def test_talk_to_command(self):
 		tavern, _, _, npc = _make_world()
-		action, inputs = parse("talk to barkeep", tavern)
+		action, inputs = parse("talk-to barkeep", tavern)
 		assert action == Action.TALK_TO
 		assert inputs[0] is npc
 
 	def test_talk_to_unresolved(self):
 		room = Room("R")
-		action, inputs = parse("talk to ghost", room)
+		action, inputs = parse("talk-to ghost", room)
 		assert action == Action.TALK_TO
 		assert inputs[0] == "ghost"
 

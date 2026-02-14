@@ -157,9 +157,11 @@ class LoginUI(View):
 
 	# -- tab completion -------------------------------------------------------
 
+	_MENU_COMMANDS = ("login", "register", "quit", "credits")
+
 	def _get_tab_candidates(self, partial: str) -> list[str]:
 		if self.step == "menu":
-			return [c for c in ("1", "2") if c.startswith(partial)]
+			return [c for c in self._MENU_COMMANDS if c.startswith(partial)]
 		return []
 
 	# -- layout ---------------------------------------------------------------
@@ -169,7 +171,7 @@ class LoginUI(View):
 			return (
 				"[bold]Welcome to the MUD![/bold]\n\n"
 				"  [cyan]Login[/cyan]\n\n"
-				"  [cyan]Create Account[/cyan]\n\n"
+				"  [cyan]Register[/cyan]\n\n"
 				"  [cyan]Quit[/cyan]"
 			)
 		if self.step == "login_username":

@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING
 
 from Objects.Characters.character import Character
 from logic.actions import Action, execute, parse
+from UI.panels import CHAT_CHAR, CHAT_CHAT_CHAR, CHAT_CHAT_TEXT, CHAT_TEXT
 
 if TYPE_CHECKING:
 	from UI.in_game_ui.gameUI import GameUI
@@ -59,6 +60,22 @@ class CommandDispatcher:
 
 		action, inputs = parse(cmd, ui.current_room)
 		result = execute(action, inputs, ui.current_room)
+
+		# Handle chat — broadcast to room chat panel
+		if action == Action.CHAT and world and char_id:
+			message = inputs[0] if inputs else ""
+			if not message:
+				ui.event_history.append("[red]Chat what?[/red]")
+				self._trim_history(ui)
+				return
+			name = ui.player.name
+			ui.room_chat.append(f"[{CHAT_CHAR}]{name}:[/{CHAT_CHAR}] [{CHAT_TEXT}]{message}[/{CHAT_TEXT}]")
+			world.broadcast_chat_to_room(
+				ui.current_room,
+				f"[{CHAT_CHAT_CHAR}]{name}:[/{CHAT_CHAT_CHAR}] [{CHAT_CHAT_TEXT}]{message}[/{CHAT_CHAT_TEXT}]",
+				exclude=char_id,
+			)
+			return
 
 		# Handle party commands via PartyManager
 		if world and char_id and action in _PARTY_ACTIONS:

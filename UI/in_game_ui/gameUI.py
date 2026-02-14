@@ -6,11 +6,11 @@ event history) and owns the Rich layout that is redrawn every frame.
 Layout structure::
 
     +-----------+---------------------+----------+
-    |  Event    |   Current Events    |   Map    |
-    |  History  |                     |----------|
-    |           |                     |  Stats   |
-    |           |---------------------|----------|
-    |           |  Command Input      | Inventory|
+    |   Chat    |   Current Events    |   Map    |
+    |           |                     |----------|
+    | --------- |                     |  Stats   |
+    |  Event    |---------------------|----------|
+    |  history  |  Command Input      | Inventory|
     +-----------+---------------------+----------+
 """
 
@@ -26,12 +26,13 @@ from UI.commands import CommandDispatcher
 from UI.map_renderer import MapRenderer
 from UI.panels import (
 	CommandInputPanel,
+	CoreStatsPanel,
 	CurrentEventsPanel,
 	EventHistoryPanel,
-	InventoryPanel,
+	RoomCharactersPanel,
+	RoomChat,
 	StatsPanel,
 )
-from UI.tab_completion import CompletionState, common_prefix
 from UI.viewsClass import View
 
 from logic.actions import COMMAND_REGISTRY
@@ -53,8 +54,6 @@ class GameUI(View):
 
 	MAX_HISTORY = 60
 
-	_TWO_WORD_VERBS = {"talk to": "talk_to"}
-
 	def __init__(
 		self,
 		world_manager: WorldManager,
@@ -72,10 +71,17 @@ class GameUI(View):
 		self.event_history: list[str] = [
 			"[dim]Welcome to the MUD! Type [bold]help[/bold] for commands.[/dim]",
 		]
+		self.room_chat: list[str] = []
 		self._dispatcher = CommandDispatcher()
 
 		# Register with the shared world
-		world_manager.join(character_id, player, self.current_room, self._receive_event)
+		world_manager.join(
+			character_id,
+			player,
+			self.current_room,
+			self._receive_event,
+			self._receive_chat,
+		)
 
 		# Show the starting room description immediately
 		self._dispatcher.dispatch(self, "look")
@@ -84,98 +90,36 @@ class GameUI(View):
 		"""Callback invoked by WorldManager to push events into this session."""
 		self.event_history.append(message)
 
+	def _receive_chat(self, message: str) -> None:
+		"""Callback invoked by WorldManager to push chat messages into this session."""
+		self.room_chat.append(message)
+
 	def _handle_input(self, text: str) -> None:
 		"""Dispatch command through the command dispatcher."""
 		self._dispatcher.dispatch(self, text)
 
-	# -- tab completion (command-aware) ------------------------------------
+	# -- tab completion (delegates to base View / run_completion) ----------
 
-	def handle_tab(self) -> None:
-		"""Handle tab completion for game commands and arguments."""
+	def _get_tab_candidates(self, partial: str) -> list[str]:
+		"""Return completion candidates for commands and their arguments.
+
+		When completing a command (first token), returns command names.
+		When completing an argument, returns target names prefixed with
+		the verb so that ``run_completion`` can set the full buffer.
+		"""
 		buffer = self.input_buffer
-		state = self.completion_state
-
-		# Reset state if buffer changed since last tab
-		if state is not None and state.original_buffer != buffer:
-			state = None
-			self.completion_state = None
-
-		# Determine context (command vs argument)
 		parts = buffer.split(None, 1)
 		completing_command = len(parts) == 0 or (len(parts) == 1 and not buffer.endswith(" "))
 
-		verb = ""
-		partial = ""
-		verb_prefix = ""
-
 		if completing_command:
-			partial = parts[0] if parts else ""
-			candidates = self._get_command_candidates(partial)
-		else:
-			verb = parts[0]
-			partial = parts[1] if len(parts) > 1 else ""
-			verb_prefix = verb + " "
+			p = partial.lower()
+			return sorted({v for v in COMMAND_REGISTRY if v.startswith(p)})
 
-			# Check for two-word verb: "talk to <arg>"
-			if len(parts) > 1:
-				for tw, registry_key in self._TWO_WORD_VERBS.items():
-					prefix = tw[len(verb) :]
-					if parts[1].lower().startswith(prefix.lstrip()):
-						rest = parts[1][len(prefix.lstrip()) :].lstrip()
-						partial = rest
-						verb_prefix = tw + " "
-						verb = registry_key
-						break
+		# Completing an argument
+		verb = parts[0].lower()
+		arg_partial = parts[1].lower() if len(parts) > 1 else ""
 
-			candidates = self._get_argument_candidates(verb, partial)
-
-		if not candidates:
-			return
-
-		# First tab press
-		if state is None:
-			if len(candidates) == 1:
-				self.input_buffer = verb_prefix + candidates[0]
-				self.completion_state = None
-				return
-
-			prefix = common_prefix(candidates)
-			state = CompletionState(
-				candidates=candidates,
-				cycle_index=0,
-				original_buffer=buffer,
-				tab_count=1,
-			)
-
-			if prefix and prefix.lower() != partial.lower():
-				self.input_buffer = verb_prefix + prefix
-				state.original_buffer = self.input_buffer
-
-			self.completion_state = state
-			return
-
-		# Subsequent tab presses
-		state.tab_count += 1
-
-		if state.tab_count == 2:
-			formatted = "  ".join(f"[cyan]{c}[/cyan]" for c in state.candidates)
-			self.event_history.append(f"[dim]Completions:[/dim] {formatted}")
-			state.original_buffer = self.input_buffer
-		else:
-			candidate = state.candidates[state.cycle_index]
-			self.input_buffer = verb_prefix + candidate
-			state.cycle_index = (state.cycle_index + 1) % len(state.candidates)
-			state.original_buffer = self.input_buffer
-
-	# -- candidate generators ----------------------------------------------
-
-	@staticmethod
-	def _get_command_candidates(partial: str) -> list[str]:
-		p = partial.lower()
-		return sorted({v for v in COMMAND_REGISTRY if v.startswith(p)})
-
-	def _get_argument_candidates(self, verb: str, partial: str) -> list[str]:
-		target_type = COMMAND_REGISTRY.get(verb.lower())
+		target_type = COMMAND_REGISTRY.get(verb)
 		if target_type is None:
 			return []
 
@@ -189,11 +133,12 @@ class GameUI(View):
 		collector = collectors.get(target_type, self._get_all_targets)
 		all_names = collector()
 
-		p = partial.lower()
-		return sorted(
-			[name for name in all_names if name.lower().startswith(p)],
+		matches = sorted(
+			[name for name in all_names if name.lower().startswith(arg_partial)],
 			key=str.lower,
 		)
+		# Include the verb so run_completion sets the full buffer
+		return [f"{verb} {name}" for name in matches]
 
 	def _get_room_names(self) -> list[str]:
 		return [r.name for r in self.current_room.connected_rooms.values()]
@@ -203,7 +148,6 @@ class GameUI(View):
 
 	def _get_character_names(self) -> list[str]:
 		names = [char.name for char in self.current_room.present_characters]
-		# Include other players in the room
 		for p in self.current_room.present_players:
 			if p is not self.player:
 				names.append(p.name)
@@ -225,22 +169,30 @@ class GameUI(View):
 			Layout(name="middle", ratio=3),
 			Layout(name="right", ratio=1),
 		)
+
+		layout["left"].split_column(
+			Layout(name="chat", ratio=1),
+			Layout(name="events", ratio=1),
+		)
 		layout["middle"].split_column(
 			Layout(name="current_events", ratio=1),
+			Layout(name="Core-stats", size=3),  ## hp and secondary resource bar (mana/stamina)
 			Layout(name="writing", size=3),
 		)
 		layout["right"].split_column(
 			Layout(name="map", ratio=1),
 			Layout(name="stats", ratio=1),
-			Layout(name="inventory", ratio=1),
+			Layout(name="room_characters", ratio=1),
 		)
 
-		layout["left"].update(EventHistoryPanel(self.event_history).build())
+		layout["chat"].update(RoomChat(self.room_chat, visible_count=5).build())
+		layout["events"].update(EventHistoryPanel(self.event_history).build())
 		layout["current_events"].update(CurrentEventsPanel(self.current_room).build())
+		layout["Core-stats"].update(CoreStatsPanel(self.player).build())
 		layout["writing"].update(CommandInputPanel(self.input_buffer).build())
 		layout["map"].update(MapRenderer(self.current_room, self.visited_rooms).build())
 		in_combat = self.world_manager.combat_manager.is_in_combat(self.character_id)
 		layout["stats"].update(StatsPanel(self.player, in_combat=in_combat).build())
-		layout["inventory"].update(InventoryPanel(self.player.inventory).build())
+		layout["room_characters"].update(RoomCharactersPanel(self.current_room).build())
 
 		return layout

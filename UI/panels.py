@@ -16,12 +16,17 @@ from rich.text import Text
 
 if TYPE_CHECKING:
 	from Objects.Characters.character import PlayerCharacter
-	from Objects.Items.item import Item
 	from Objects.Rooms.room import Room
+
+# Chat color placeholders — Rich markup style strings
+CHAT_CHAR = "bold cyan"
+CHAT_TEXT = "white"
+CHAT_CHAT_CHAR = "bold yellow"
+CHAT_CHAT_TEXT = "dim white"
 
 
 class EventHistoryPanel:
-	"""Scrollable event history (left column)."""
+	"""Scrollable event history (bottom left column)."""
 
 	def __init__(self, event_history: list[str], visible_count: int = 5) -> None:
 		self._history = event_history
@@ -61,6 +66,23 @@ class CurrentEventsPanel:
 			Text.from_markup("\n".join(parts)),
 			title="[bold]Current Events[/bold]",
 			border_style="green",
+			box=box.ROUNDED,
+		)
+
+
+class RoomChat:
+	"""Chat messages from other players in the same room."""
+
+	def __init__(self, messages: list[str], visible_count: int = 5) -> None:
+		self._messages = messages
+		self._visible = visible_count
+
+	def build(self) -> Panel:
+		lines = "\n".join(self._messages[-self._visible :])
+		return Panel(
+			Text.from_markup(lines),
+			title="[bold]Room Chat[/bold]",
+			border_style="bright_magenta",
 			box=box.ROUNDED,
 		)
 
@@ -113,23 +135,84 @@ class StatsPanel:
 		)
 
 
-class InventoryPanel:
-	"""Inventory panel listing items.
+class CoreStatsPanel:
+	"""HP and stamina bars displayed between events and command input."""
 
-	Note: Currently shows room items, not character inventory.
-	"""
+	HEART = "♥"
+	BAR_CHAR = "█"
+	EMPTY_CHAR = "░"
+	BAR_WIDTH = 20
 
-	def __init__(self, items: list[Item]) -> None:
-		self._items = items
+	def __init__(self, player: PlayerCharacter) -> None:
+		self._player = player
+
+	def _hp_color(self, ratio: float) -> str:
+		"""Return a color that shifts from green to red as HP drops."""
+		if ratio > 0.6:
+			return "green"
+		if ratio > 0.3:
+			return "yellow"
+		return "red"
+
+	def _build_bar(self, current: int, maximum: int, color: str) -> str:
+		"""Build a progress bar string with Rich markup."""
+		ratio = max(0.0, min(1.0, current / maximum)) if maximum > 0 else 0.0
+		filled = round(ratio * self.BAR_WIDTH)
+		empty = self.BAR_WIDTH - filled
+		return f"[{color}]{self.BAR_CHAR * filled}[/{color}][dim]{self.EMPTY_CHAR * empty}[/dim]"
 
 	def build(self) -> Panel:
-		if self._items:
-			lines = "\n".join(f"[white]{i + 1}.[/white] {item.name}" for i, item in enumerate(self._items))
-		else:
-			lines = "[dim]Nothing here.[/dim]"
+		p = self._player
+		hp_ratio = max(0.0, min(1.0, p.hp / p.max_hp)) if p.max_hp > 0 else 0.0
+		hp_color = self._hp_color(hp_ratio)
+
+		hp_bar = self._build_bar(p.hp, p.max_hp, hp_color)
+		stm_bar = self._build_bar(p.stamina, p.max_stamina, "yellow")
+
+		line = (
+			f"[{hp_color}]{self.HEART}[/{hp_color}] {hp_bar} "
+			f"[bold {hp_color}]{p.hp}/{p.max_hp}[/bold {hp_color}]"
+			f"  ⚡ {stm_bar} "
+			f"[bold yellow]{p.stamina}/{p.max_stamina}[/bold yellow]"
+		)
+
 		return Panel(
-			Text.from_markup(lines),
-			title="[bold]Inventory[/bold]",
+			Text.from_markup(line),
+			border_style="bright_black",
+			box=box.ROUNDED,
+			height=3,
+		)
+
+
+class RoomCharactersPanel:
+	"""Panel listing all characters in the current room.
+
+	Players and NPCs are shown in separate columns.
+	"""
+
+	def __init__(self, room: Room) -> None:
+		self._room = room
+
+	def build(self) -> Panel:
+		table = Table(box=None, show_header=True, padding=(0, 1), expand=True)
+		table.add_column("[bold cyan]Players[/bold cyan]")
+		table.add_column("[bold yellow]NPCs[/bold yellow]")
+
+		players = [p.name for p in self._room.present_players]
+		npcs = [c.name for c in self._room.present_characters]
+
+		rows = max(len(players), len(npcs))
+		for i in range(rows):
+			p_name = f"[cyan]{players[i]}[/cyan]" if i < len(players) else ""
+			n_name = f"[yellow]{npcs[i]}[/yellow]" if i < len(npcs) else ""
+			table.add_row(p_name, n_name)
+
+		if rows == 0:
+			table.add_row("[dim]Nobody[/dim]", "[dim]Nobody[/dim]")
+
+		return Panel(
+			table,
+			title="[bold]Characters[/bold]",
 			border_style="magenta",
 			box=box.ROUNDED,
 		)
