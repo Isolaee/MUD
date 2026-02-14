@@ -30,6 +30,9 @@ build/
 .env
 .env.local
 
+# SQLite databases
+*.db
+
 # SSH host keys (never commit private keys)
 server/host_key
 server/host_key.pub

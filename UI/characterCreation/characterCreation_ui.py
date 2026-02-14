@@ -6,12 +6,21 @@ a name and class before entering the game world.
 Steps: name -> class -> confirm
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from rich.layout import Layout
 from rich.text import Text
 
-from Objects.Characters.character import Class
+from Objects.Characters.character import CharacterClassOptions
+from Objects.Characters.characterClasses import get_all_classes
+from Objects.Characters.characterRaces import get_all_races
 from UI.panels import CommandInputPanel
 from UI.viewsClass import View
+
+if TYPE_CHECKING:
+	from server.world_manager import WorldManager
 
 
 class CharacterCreationUI(View):
@@ -19,10 +28,12 @@ class CharacterCreationUI(View):
 
 	STEPS = ("name", "class", "confirm")
 
-	def __init__(self) -> None:
+	def __init__(self, world_manager: WorldManager, account_id: int) -> None:
 		super().__init__()
+		self.world_manager = world_manager
+		self.account_id = account_id
 		self.character_name: str = ""
-		self.character_class: str = ""
+		self.character_class: CharacterClassOptions | None = None
 		self.step: str = "name"
 		self.error: str = ""
 
@@ -51,35 +62,84 @@ class CharacterCreationUI(View):
 
 	def _handle_class(self, text: str) -> None:
 		choice = text.upper()
-		valid_names = [c.name for c in Class]
+		valid_names = [c.name for c in CharacterClassOptions]
 		if choice not in valid_names:
-			self.error = f"Invalid class. Choose from: {', '.join(c.name.capitalize() for c in Class)}"
+			self.error = f"Invalid class. Choose from: {', '.join(n.capitalize() for n in valid_names)}"
 			return
-		self.character_class = Class[choice]
+		self.character_class = CharacterClassOptions[choice]
 		self.error = ""
 		self.step = "confirm"
 
 	def _handle_confirm(self, text: str) -> None:
 		answer = text.lower()
 		if answer in ("y", "yes"):
-			from UI.in_game_ui.gameUI import GameUI
-			from World.demoArea import START_ROOM
-
-			self.transition_to(GameUI, START_ROOM)
+			self._create_and_enter_game()
 		elif answer in ("n", "no"):
 			self.character_name = ""
-			self.character_class = ""
+			self.character_class = None
 			self.error = ""
 			self.step = "name"
 		else:
 			self.error = "Please type yes or no."
+
+	def _create_and_enter_game(self) -> None:
+		"""Save the new character to DB, build a PlayerCharacter, and enter the game."""
+		from Objects.Characters.character import CharacterRaceOptions, PlayerCharacter
+		from server.database import create_character_record
+		from UI.in_game_ui.gameUI import GameUI
+
+		# Calculate stats with class and race modifiers
+		race = CharacterRaceOptions.HUMAN  # default for now
+		class_instance = get_all_classes()[self.character_class.name]()
+		race_instance = get_all_races()[race.name]()
+		class_mods = class_instance.stat_modifiers
+		race_mods = race_instance.stat_modifiers
+
+		base_hp = 100
+		base_stamina = 100
+		base_attack = 10
+
+		hp = base_hp + class_mods.hp + race_mods.hp
+		stamina = base_stamina + class_mods.stamina + race_mods.stamina
+		attack = base_attack + class_mods.attack + race_mods.attack
+
+		# Save to database
+		character_id = create_character_record(
+			self.account_id,
+			self.character_name,
+			self.character_class.name,
+			race.name,
+			hp,
+			stamina,
+			attack,
+		)
+
+		# Build in-memory PlayerCharacter
+		player = PlayerCharacter(
+			current_hp=hp,
+			current_stamina=stamina,
+			base_attack=attack,
+			race=race,
+			character_class=self.character_class,
+			characterSize=race_instance.size,
+			inventory=[],
+			name=self.character_name,
+		)
+
+		self.transition_to(
+			GameUI,
+			self.world_manager,
+			player,
+			character_id,
+			self.account_id,
+		)
 
 	# -- tab completion ----------------------------------------------------
 
 	def _get_tab_candidates(self, partial: str) -> list[str]:
 		"""Return completion candidates based on the current step."""
 		if self.step == "class":
-			return [c.name.capitalize() for c in Class if c.name.lower().startswith(partial)]
+			return [c.name.capitalize() for c in CharacterClassOptions if c.name.lower().startswith(partial)]
 		if self.step == "confirm":
 			return [w for w in ("yes", "no") if w.startswith(partial)]
 		return []
@@ -91,7 +151,7 @@ class CharacterCreationUI(View):
 		if self.step == "name":
 			return "Enter your character's name:"
 		if self.step == "class":
-			classes = ", ".join(c.name.capitalize() for c in Class)
+			classes = ", ".join(c.name.capitalize() for c in CharacterClassOptions)
 			return f"Choose a class ({classes}):"
 		return (
 			f"Name:  [bold]{self.character_name}[/bold]\n"

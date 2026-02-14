@@ -31,24 +31,31 @@ from rich.console import Console
 # Add project root to path so we can import game modules
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from UI.characterCreation.characterCreation_ui import CharacterCreationUI
+from server.database import init_db
+from server.world_manager import WorldManager
+from UI.login_ui import LoginUI
 
 
 # -- Refresh rate for the render loop --
 FPS = 20
 
+# Module-level world manager, created during start_server().
+_world: WorldManager | None = None
+
 
 class SSHGameSession:
 	"""A single player's game session over SSH.
 
-	Owns a View (starting with CharacterCreationUI) and drives
-	the render loop + input handling that normally lives in
-	Application and InputHandler, but adapted for async SSH I/O.
+	Owns a View (starting with LoginUI) and drives the render loop
+	+ input handling that normally lives in Application and
+	InputHandler, but adapted for async SSH I/O.
 	"""
 
-	def __init__(self, process: asyncssh.SSHServerProcess):
+	def __init__(self, process: asyncssh.SSHServerProcess, world: WorldManager):
 		self.process = process
-		self.view = CharacterCreationUI()
+		self.world = world
+		self.view = LoginUI(world)
+		self.active_character_id: int | None = None
 
 	def _get_active_view(self):
 		"""Walk the next_view chain to find the leaf view."""
@@ -110,6 +117,9 @@ class SSHGameSession:
 		except asyncio.CancelledError:
 			pass
 		finally:
+			# Clean up player from shared world on disconnect
+			if self.active_character_id is not None:
+				self.world.leave(self.active_character_id)
 			proc.stdout.write("\033[?25h")  # show cursor
 			proc.stdout.write("\033[?1049l")  # restore main screen buffer
 			proc.stdout.write("Thanks for playing! Goodbye.\r\n")
@@ -124,6 +134,12 @@ class SSHGameSession:
 			term_size = proc.get_terminal_size()
 			if term_size:
 				width, height = term_size[0], term_size[1]
+
+			# Track active character_id for disconnect cleanup
+			active = self._get_active_view()
+			char_id = getattr(active, "character_id", None)
+			if char_id is not None:
+				self.active_character_id = char_id
 
 			frame = self._render_frame(width, height)
 
@@ -208,7 +224,7 @@ class MudSSHServer(asyncssh.SSHServer):
 
 async def handle_client(process: asyncssh.SSHServerProcess):
 	"""Called when a client opens a shell session."""
-	session = SSHGameSession(process)
+	session = SSHGameSession(process, _world)
 	await session.run()
 
 
@@ -234,6 +250,14 @@ def _load_host_key():
 
 async def start_server():
 	"""Start the SSH server."""
+	global _world
+
+	# Initialise database and shared world state
+	init_db()
+	_world = WorldManager()
+	_world.load_world()
+	print("World loaded.")
+
 	host_key = _load_host_key()
 	if host_key is None:
 		return

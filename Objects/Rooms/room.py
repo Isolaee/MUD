@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING
 from Objects.game_object import GameObject
 
 if TYPE_CHECKING:
-	from Objects.Characters.character import Character
+	from Objects.Characters.character import Character, PlayerCharacter
 	from Objects.Items.item import Item
 
 
@@ -98,6 +98,7 @@ class Room(GameObject):
 		self.connected_rooms: dict[Direction, Room] = {}
 		self.present_items: list[Item] = []
 		self.present_characters: list[Character] = []
+		self.present_players: list[PlayerCharacter] = []
 
 	def object_type(self) -> str:
 		return "Room"

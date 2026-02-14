@@ -14,8 +14,13 @@ Layout structure::
     +-----------+---------------------+----------+
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from rich.layout import Layout
 
+from Objects.Characters.character import PlayerCharacter
 from Objects.Rooms.room import Room
 from UI.commands import CommandDispatcher
 from UI.map_renderer import MapRenderer
@@ -31,6 +36,9 @@ from UI.viewsClass import View
 
 from logic.actions import COMMAND_REGISTRY
 
+if TYPE_CHECKING:
+	from server.world_manager import WorldManager
+
 
 class GameUI(View):
 	"""Central state object shared between the render loop and input thread.
@@ -39,22 +47,42 @@ class GameUI(View):
 		MAX_HISTORY: Maximum number of event-log entries kept in memory.
 		current_room: The room the player is currently in.
 		event_history: Chronological list of Rich-markup log messages.
+		player: The PlayerCharacter for this session.
+		character_id: DB id of the character (used for saves and world tracking).
 	"""
 
 	MAX_HISTORY = 60
 
 	_TWO_WORD_VERBS = {"talk to": "talk_to"}
 
-	def __init__(self, starting_room: Room) -> None:
+	def __init__(
+		self,
+		world_manager: WorldManager,
+		player: PlayerCharacter,
+		character_id: int,
+		account_id: int,
+	) -> None:
 		super().__init__()
-		self.current_room: Room = starting_room
-		self.visited_rooms: set[Room] = {starting_room}
+		self.world_manager = world_manager
+		self.player = player
+		self.character_id = character_id
+		self.account_id = account_id
+		self.current_room: Room = world_manager.start_room
+		self.visited_rooms: set[Room] = {self.current_room}
 		self.event_history: list[str] = [
 			"[dim]Welcome to the MUD! Type [bold]help[/bold] for commands.[/dim]",
 		]
 		self._dispatcher = CommandDispatcher()
+
+		# Register with the shared world
+		world_manager.join(character_id, player, self.current_room, self._receive_event)
+
 		# Show the starting room description immediately
 		self._dispatcher.dispatch(self, "look")
+
+	def _receive_event(self, message: str) -> None:
+		"""Callback invoked by WorldManager to push events into this session."""
+		self.event_history.append(message)
 
 	def _handle_input(self, text: str) -> None:
 		"""Dispatch command through the command dispatcher."""
@@ -174,7 +202,12 @@ class GameUI(View):
 		return [item.name for item in self.current_room.present_items]
 
 	def _get_character_names(self) -> list[str]:
-		return [char.name for char in self.current_room.present_characters]
+		names = [char.name for char in self.current_room.present_characters]
+		# Include other players in the room
+		for p in self.current_room.present_players:
+			if p is not self.player:
+				names.append(p.name)
+		return names
 
 	def _get_look_targets(self) -> list[str]:
 		return self._get_item_names() + self._get_room_names()
@@ -206,7 +239,7 @@ class GameUI(View):
 		layout["current_events"].update(CurrentEventsPanel(self.current_room).build())
 		layout["writing"].update(CommandInputPanel(self.input_buffer).build())
 		layout["map"].update(MapRenderer(self.current_room, self.visited_rooms).build())
-		layout["stats"].update(StatsPanel().build())
-		layout["inventory"].update(InventoryPanel(self.current_room.present_items).build())
+		layout["stats"].update(StatsPanel(self.player).build())
+		layout["inventory"].update(InventoryPanel(self.player.inventory).build())
 
 		return layout

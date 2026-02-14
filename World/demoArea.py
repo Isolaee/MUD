@@ -13,7 +13,7 @@ Room layout::
       +----------------------------+
 """
 
-from Objects.Characters.character import NonPlayerCharacter, Race
+from Objects.Characters.character import CharacterClassOptions, CharacterRaceOptions, NonPlayerCharacter
 from Objects.Characters.characterRaces import CharacterSize
 from Objects.Items.Swords.shortSword import ShortSword
 from Objects.Rooms.room import Room, Description, Direction
@@ -67,7 +67,8 @@ guide = NonPlayerCharacter(
 	current_hp=20,
 	current_stamina=10,
 	base_attack=1,
-	race=Race.HUMAN,
+	race=CharacterRaceOptions.HUMAN,
+	character_class=CharacterClassOptions.WARRIOR,
 	characterSize=CharacterSize.MEDIUM,
 	inventory=[],
 )
