@@ -39,6 +39,7 @@ COMMAND_ALIASES: dict[str, str] = {
 	"take": "pick_up",
 	"atk": "attack",
 	"hit": "attack",
+	"lp": "leave_party",
 }
 
 # Maps each known verb to the type of targets it expects.
@@ -56,6 +57,11 @@ _CANONICAL_COMMANDS: dict[str, str | None] = {
 	"drop": "items",
 	"talk_to": "characters",
 	"whisper": "characters",
+	"invite": "characters",
+	"accept": None,
+	"decline": None,
+	"leave_party": None,
+	"party": None,
 }
 
 # Build full registry including aliases (each alias gets the same target type).
@@ -77,6 +83,11 @@ class Action(Enum):
 	DROP = auto()
 	TALK_TO = auto()
 	WHISPER = auto()
+	INVITE = auto()
+	ACCEPT = auto()
+	DECLINE = auto()
+	LEAVE_PARTY = auto()
+	PARTY = auto()
 	HELP = auto()
 	QUIT = auto()
 
@@ -138,6 +149,26 @@ def parse(raw: str, current_room: Room) -> tuple[Action, list]:
 	if verb == "quit":
 		return Action.QUIT, []
 
+	if verb == "attack":
+		target = _resolve_attack_target(arg, current_room)
+		return Action.ATTACK, [target]
+
+	if verb == "invite":
+		target = _resolve_attack_target(arg, current_room)
+		return Action.INVITE, [target]
+
+	if verb == "accept":
+		return Action.ACCEPT, []
+
+	if verb == "decline":
+		return Action.DECLINE, []
+
+	if verb == "leave_party":
+		return Action.LEAVE_PARTY, []
+
+	if verb == "party":
+		return Action.PARTY, []
+
 	if verb == "talk_to":
 		target = _resolve_character_target(arg, current_room)
 		return Action.TALK_TO, [target]
@@ -158,9 +189,16 @@ def execute(action: Action, inputs: list, current_room: Room) -> ActionResult:
 		Action.LOOK: _exec_look,
 		Action.MOVE: _exec_move,
 		Action.INVENTORY: _exec_inventory,
+		Action.ATTACK: _exec_attack,
 		Action.TALK_TO: _exec_talk_to,
 		Action.HELP: _exec_help,
 		Action.QUIT: _exec_quit,
+		# Party commands return empty results; handled by CommandDispatcher
+		Action.INVITE: _exec_noop,
+		Action.ACCEPT: _exec_noop,
+		Action.DECLINE: _exec_noop,
+		Action.LEAVE_PARTY: _exec_noop,
+		Action.PARTY: _exec_noop,
 	}
 	return handlers[action](inputs, current_room)
 
@@ -204,6 +242,21 @@ def _resolve_character_target(arg: str, current_room: Room):
 	for char in current_room.present_characters:
 		if char.name.lower() == arg:
 			return char
+	return arg  # unresolved
+
+
+def _resolve_attack_target(arg: str, current_room: Room):
+	"""Resolve an attack/invite target — NPCs and other players."""
+	if not arg:
+		return arg
+	# Check NPCs first
+	for char in current_room.present_characters:
+		if char.name.lower() == arg:
+			return char
+	# Check other players
+	for player in current_room.present_players:
+		if player.name.lower() == arg:
+			return player
 	return arg  # unresolved
 
 
@@ -313,6 +366,25 @@ def _exec_help(inputs: list, current_room: Room) -> ActionResult:
 	if exits:
 		result.messages.append(f"[bold]Current exits:[/bold] {exits}")
 	return result
+
+
+def _exec_attack(inputs: list, current_room: Room) -> ActionResult:
+	"""Resolve attack target. Actual combat is started by CommandDispatcher."""
+	result = ActionResult()
+	if not inputs or not inputs[0]:
+		result.messages.append("[red]Attack whom?[/red]")
+		return result
+
+	target = inputs[0]
+	if isinstance(target, str):
+		result.messages.append(f"[red]You don't see '{target}' here.[/red]")
+	# If target is a Character, CommandDispatcher will handle starting combat
+	return result
+
+
+def _exec_noop(inputs: list, current_room: Room) -> ActionResult:
+	"""Placeholder for commands handled entirely by CommandDispatcher."""
+	return ActionResult()
 
 
 def _exec_quit(inputs: list, current_room: Room) -> ActionResult:

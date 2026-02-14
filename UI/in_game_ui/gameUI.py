@@ -239,7 +239,8 @@ class GameUI(View):
 		layout["current_events"].update(CurrentEventsPanel(self.current_room).build())
 		layout["writing"].update(CommandInputPanel(self.input_buffer).build())
 		layout["map"].update(MapRenderer(self.current_room, self.visited_rooms).build())
-		layout["stats"].update(StatsPanel(self.player).build())
+		in_combat = self.world_manager.combat_manager.is_in_combat(self.character_id)
+		layout["stats"].update(StatsPanel(self.player, in_combat=in_combat).build())
 		layout["inventory"].update(InventoryPanel(self.player.inventory).build())
 
 		return layout

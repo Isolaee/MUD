@@ -20,6 +20,9 @@ if TYPE_CHECKING:
 	from Objects.Characters.character import PlayerCharacter
 	from Objects.Items.item import Item
 
+from logic.combat import CombatManager
+from logic.party import PartyManager
+
 
 @dataclass
 class GameSession:
@@ -38,6 +41,8 @@ class WorldManager:
 		self.rooms: dict[str, Room] = {}
 		self.start_room: Room | None = None
 		self.sessions: dict[int, GameSession] = {}  # character_id -> session
+		self.combat_manager = CombatManager()
+		self.party_manager = PartyManager()
 
 	# -- world loading --------------------------------------------------------
 
@@ -106,16 +111,27 @@ class WorldManager:
 			f"[dim]{player.name} has left the world.[/dim]",
 			exclude=character_id,
 		)
+		# Clean up combat and party state
+		self.combat_manager.remove_player(character_id, self)
+		self.party_manager.remove_player(character_id, self)
+
 		# Persist character state
 		from server.database import save_character
 
 		save_character(character_id, player.hp, player.stamina)
 
-	def move_player(self, character_id: int, target_room: Room) -> None:
-		"""Atomically move a player between rooms and broadcast to both."""
+	def move_player(self, character_id: int, target_room: Room) -> bool:
+		"""Atomically move a player between rooms and broadcast to both.
+
+		Returns False if movement is blocked (e.g. player is in combat).
+		"""
 		session = self.sessions.get(character_id)
 		if session is None:
-			return
+			return False
+
+		if self.combat_manager.is_in_combat(character_id):
+			session.event_callback("[red]You can't move while in combat![/red]")
+			return False
 		old_room = session.room
 		player = session.player
 
@@ -136,6 +152,7 @@ class WorldManager:
 			f"[dim]{player.name} has arrived.[/dim]",
 			exclude=character_id,
 		)
+		return True
 
 	# -- event broadcasting ---------------------------------------------------
 

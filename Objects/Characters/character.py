@@ -19,6 +19,7 @@ from Objects.Characters.characterRaces import CharacterSize, get_all_races
 from Objects.game_object import GameObject
 
 if TYPE_CHECKING:
+	from Objects.Items.weapons import Weapon
 	from Objects.Rooms.room import Room
 	from Quests.quest import Quest
 
@@ -77,6 +78,8 @@ class PlayerCharacter(Character):
 		self.character_class = character_class
 		self.size = characterSize
 		self.inventory = inventory
+		self.equipped_weapon: Weapon | None = None
+		self.is_knocked_out: bool = False
 		self.visited_rooms: set[Room] = set()
 
 	def create_character(
