@@ -72,7 +72,9 @@ class PlayerCharacter(Character):
 	) -> None:
 		super().__init__(**kwargs)
 		self.hp = current_hp
+		self.max_hp = current_hp
 		self.stamina = current_stamina
+		self.max_stamina = current_stamina
 		self.base_attack = base_attack  # Do we want to derive base attack value from race? Base attack would not be defined on creation but calculated on demand based on race, size and items.
 		self.race = race
 		self.character_class = character_class

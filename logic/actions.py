@@ -32,14 +32,15 @@ COMMAND_ALIASES: dict[str, str] = {
 	"i": "inventory",
 	"exit": "quit",
 	"q": "quit",
-	"talk to": "talk_to",
+	"tt": "talk-to",
+	"whisper": "whisper",
 	"examine": "inspect",
-	"get": "pick_up",
-	"grab": "pick_up",
-	"take": "pick_up",
+	"get": "pick-up",
+	"grab": "pick-up",
+	"take": "pick-up",
 	"atk": "attack",
 	"hit": "attack",
-	"lp": "leave_party",
+	"lp": "leave-party",
 }
 
 # Maps each known verb to the type of targets it expects.
@@ -53,15 +54,19 @@ _CANONICAL_COMMANDS: dict[str, str | None] = {
 	"quit": None,
 	"attack": "characters",
 	"inspect": "all",
-	"pick_up": "items",
+	"pick-up": "items",
 	"drop": "items",
-	"talk_to": "characters",
+	"talk-to": "characters",
 	"whisper": "characters",
 	"invite": "characters",
 	"accept": None,
 	"decline": None,
-	"leave_party": None,
+	"leave-party": None,
 	"party": None,
+	"defend": None,
+	"flee": None,
+	"login": None,
+	"register": None,
 }
 
 # Build full registry including aliases (each alias gets the same target type).
@@ -129,14 +134,6 @@ def parse(raw: str, current_room: Room) -> tuple[Action, list]:
 	# Resolve aliases to canonical command names
 	verb = COMMAND_ALIASES.get(verb, verb)
 
-	# Two-word alias: "talk to <target>"
-	if verb == "talk" and arg.startswith("to "):
-		verb = "talk_to"
-		arg = arg[3:]
-	elif verb == "talk" and arg == "to":
-		verb = "talk_to"
-		arg = ""
-
 	if verb == "look":
 		return Action.LOOK, [_resolve_look_target(arg, current_room)]
 
@@ -163,13 +160,13 @@ def parse(raw: str, current_room: Room) -> tuple[Action, list]:
 	if verb == "decline":
 		return Action.DECLINE, []
 
-	if verb == "leave_party":
+	if verb == "leave-party":
 		return Action.LEAVE_PARTY, []
 
 	if verb == "party":
 		return Action.PARTY, []
 
-	if verb == "talk_to":
+	if verb == "talk-to":
 		target = _resolve_character_target(arg, current_room)
 		return Action.TALK_TO, [target]
 
@@ -361,7 +358,7 @@ def _exec_help(inputs: list, current_room: Room) -> ActionResult:
 	result = ActionResult()
 	connections = current_room.connected_rooms
 	exits = ", ".join(r.name for r in connections.values())
-	commands = ", ".join(a.name.lower().replace("_", " ") for a in Action)
+	commands = ", ".join(a.name.lower().replace("_", "-") for a in Action)
 	result.messages.append(f"[bold]Commands:[/bold] {commands}")
 	if exits:
 		result.messages.append(f"[bold]Current exits:[/bold] {exits}")

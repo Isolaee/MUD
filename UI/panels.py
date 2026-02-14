@@ -113,6 +113,55 @@ class StatsPanel:
 		)
 
 
+class CoreStatsPanel:
+	"""HP and stamina bars displayed between events and command input."""
+
+	HEART = "♥"
+	BAR_CHAR = "█"
+	EMPTY_CHAR = "░"
+	BAR_WIDTH = 20
+
+	def __init__(self, player: PlayerCharacter) -> None:
+		self._player = player
+
+	def _hp_color(self, ratio: float) -> str:
+		"""Return a color that shifts from green to red as HP drops."""
+		if ratio > 0.6:
+			return "green"
+		if ratio > 0.3:
+			return "yellow"
+		return "red"
+
+	def _build_bar(self, current: int, maximum: int, color: str) -> str:
+		"""Build a progress bar string with Rich markup."""
+		ratio = max(0.0, min(1.0, current / maximum)) if maximum > 0 else 0.0
+		filled = round(ratio * self.BAR_WIDTH)
+		empty = self.BAR_WIDTH - filled
+		return f"[{color}]{self.BAR_CHAR * filled}[/{color}][dim]{self.EMPTY_CHAR * empty}[/dim]"
+
+	def build(self) -> Panel:
+		p = self._player
+		hp_ratio = max(0.0, min(1.0, p.hp / p.max_hp)) if p.max_hp > 0 else 0.0
+		hp_color = self._hp_color(hp_ratio)
+
+		hp_bar = self._build_bar(p.hp, p.max_hp, hp_color)
+		stm_bar = self._build_bar(p.stamina, p.max_stamina, "yellow")
+
+		line = (
+			f"[{hp_color}]{self.HEART}[/{hp_color}] {hp_bar} "
+			f"[bold {hp_color}]{p.hp}/{p.max_hp}[/bold {hp_color}]"
+			f"  ⚡ {stm_bar} "
+			f"[bold yellow]{p.stamina}/{p.max_stamina}[/bold yellow]"
+		)
+
+		return Panel(
+			Text.from_markup(line),
+			border_style="bright_black",
+			box=box.ROUNDED,
+			height=3,
+		)
+
+
 class InventoryPanel:
 	"""Inventory panel listing items.
 
