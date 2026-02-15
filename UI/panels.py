@@ -37,7 +37,7 @@ class EventHistoryPanel:
 		return Panel(
 			Text.from_markup(lines),
 			title="[bold]Event History[/bold]",
-			border_style="bright_blue",
+			border_style="cyan",
 			box=box.ROUNDED,
 		)
 
@@ -65,7 +65,7 @@ class CurrentEventsPanel:
 		return Panel(
 			Text.from_markup("\n".join(parts)),
 			title="[bold]Current Events[/bold]",
-			border_style="green",
+			border_style="cyan",
 			box=box.ROUNDED,
 		)
 
@@ -82,7 +82,7 @@ class RoomChat:
 		return Panel(
 			Text.from_markup(lines),
 			title="[bold]Room Chat[/bold]",
-			border_style="bright_magenta",
+			border_style="cyan",
 			box=box.ROUNDED,
 		)
 
@@ -96,7 +96,6 @@ class CommandInputPanel:
 	def build(self) -> Panel:
 		return Panel(
 			Text.from_markup(f"> {self._buffer}\u2588"),
-			title="[bold]Command[/bold]",
 			border_style="white",
 			box=box.ROUNDED,
 			height=3,
@@ -130,7 +129,7 @@ class StatsPanel:
 		return Panel(
 			table,
 			title="[bold]Character Stats[/bold]",
-			border_style="red",
+			border_style="cyan",
 			box=box.ROUNDED,
 		)
 
@@ -178,7 +177,7 @@ class CoreStatsPanel:
 
 		return Panel(
 			Text.from_markup(line),
-			border_style="bright_black",
+			border_style="cyan",
 			box=box.ROUNDED,
 			height=3,
 		)
@@ -213,6 +212,6 @@ class RoomCharactersPanel:
 		return Panel(
 			table,
 			title="[bold]Characters[/bold]",
-			border_style="magenta",
+			border_style="cyan",
 			box=box.ROUNDED,
 		)
