@@ -21,6 +21,8 @@ from enum import Enum, auto
 
 from Objects.Characters.character import NonPlayerCharacter
 from Objects.Rooms.room import Room
+from Quests.objective import ObjectiveType
+from Quests.quest import QuestStatus
 
 # Maps alias -> canonical command name.
 # Canonical commands map to themselves implicitly.
@@ -157,7 +159,7 @@ def parse(raw: str, current_room: Room) -> tuple[Action, list]:
 		return Action.INVITE, [target]
 
 	if verb == "accept":
-		return Action.ACCEPT, []
+		return Action.ACCEPT, [arg] if arg else []
 
 	if verb == "decline":
 		return Action.DECLINE, []
@@ -343,12 +345,51 @@ def _exec_talk_to(inputs: list, current_room: Room) -> ActionResult:
 		result.messages.append(f"[dim]You talk to {target.name}.[/dim]")
 		if target.quest is not None:
 			quest = target.quest
-			desc = quest.description
-			if desc and desc.long:
-				result.messages.append(f"[dim]{desc.long}[/dim]")
-			elif desc and desc.short:
-				result.messages.append(f"[dim]{desc.short}[/dim]")
-			result.messages.append(f"[yellow]Quest available: {quest.name}[/yellow]")
+			if quest.status == QuestStatus.NOT_STARTED:
+				desc = quest.description
+				if desc and desc.long:
+					result.messages.append(f"[dim]{desc.long}[/dim]")
+				elif desc and desc.short:
+					result.messages.append(f"[dim]{desc.short}[/dim]")
+				result.messages.append(f"[yellow]Quest available: {quest.name}[/yellow]")
+			elif quest.status == QuestStatus.IN_PROGRESS:
+				# Advance TALK_TO objectives that match this NPC
+				for obj in quest.objectives:
+					if (
+						obj.objective_type == ObjectiveType.TALK_TO
+						and not obj.is_complete()
+						and obj.target_name.lower() == target.name.lower()
+					):
+						obj.advance()
+				# Check if all objectives are now done
+				quest.complete()
+				if quest.status == QuestStatus.COMPLETED:
+					# Auto turn-in since we're talking to the quest giver
+					rewards = quest.turn_in()
+					desc = quest.completed_description
+					if desc and desc.long:
+						result.messages.append(f"[dim]{desc.long}[/dim]")
+					elif desc and desc.short:
+						result.messages.append(f"[dim]{desc.short}[/dim]")
+					result.messages.append(f"[green]Quest completed: {quest.name}[/green]")
+					for reward in rewards:
+						result.messages.append(f"  [yellow]- {reward.description}[/yellow]")
+				else:
+					result.messages.append(f"[dim]{target.name} nods at you.[/dim]")
+					result.messages.append(f"[yellow]Quest in progress: {quest.name}[/yellow]")
+			elif quest.status == QuestStatus.COMPLETED:
+				# Quest done but not yet turned in — turn in now
+				rewards = quest.turn_in()
+				desc = quest.completed_description
+				if desc and desc.long:
+					result.messages.append(f"[dim]{desc.long}[/dim]")
+				elif desc and desc.short:
+					result.messages.append(f"[dim]{desc.short}[/dim]")
+				result.messages.append(f"[green]Quest completed: {quest.name}[/green]")
+				for reward in rewards:
+					result.messages.append(f"  [yellow]- {reward.description}[/yellow]")
+			elif quest.status == QuestStatus.TURNED_IN:
+				result.messages.append(f"[dim]{target.name} has nothing more for you.[/dim]")
 		else:
 			result.messages.append(f"[dim]{target.name} has nothing to say.[/dim]")
 	elif isinstance(target, str):

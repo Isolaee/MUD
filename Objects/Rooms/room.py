@@ -10,6 +10,7 @@ room A towards room B automatically creates the reverse link.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from enum import Enum, auto
 from typing import TYPE_CHECKING
 
@@ -99,6 +100,9 @@ class Room(GameObject):
 		self.present_items: list[Item] = []
 		self.present_characters: list[Character] = []
 		self.present_players: list[PlayerCharacter] = []
+		self.first_time_visited_text: str | None = None
+		self.on_enter_text: str | None = None
+		self.on_enter_action: Callable[[PlayerCharacter, Room], list[str]] | None = None
 
 	def object_type(self) -> str:
 		return "Room"

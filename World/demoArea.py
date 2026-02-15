@@ -1,84 +1,90 @@
-"""Demo area — the starting zone used for development and testing.
-
-Defines three interconnected rooms and a sample weapon.  This module
-is imported by ``app.py`` and exposes ``START_ROOM`` as the player's
-initial location.
-
-Room layout::
-
-            Town Square (introTown)
-                  |
-    Room 3 ---- Room Intro ---- Room 2
-      |                            |
-      +----------------------------+
-"""
-
 from Objects.Characters.character import CharacterClassOptions, CharacterRaceOptions, NonPlayerCharacter
 from Objects.Characters.characterRaces import CharacterSize
-from Objects.Items.Swords.shortSword import ShortSword
 from Objects.Rooms.room import Room, Description, Direction
-from Quests.demoQuest import DemoQuest
-from World.FirstTown import introTown
+from Quests.StartingTown.look_like_a_decent_person import LookLikeADecentPerson
 
 # -- rooms --
 
-intro_room = Room("Room Intro")
-intro_room.description = Description(
-	short="Small intro room.",
-	long=("A intro room with a sword on the ground. A doorway leads east."),
+roadside = Room("Roadside")
+roadside.description = Description(
+	short="A short road with a gutter.",
+	long=(
+		"A short stretch of road runs here, bordered by a shallow gutter. The air is fresh with the scent of nearby greenery."
+	),
 )
+roadside.first_time_visited_text = "You wake up from the gutter, it's dawn and your head is pounding. You have some fussy memories of a night of drinking, but nothing concrete. You money pouch is gone and you are wearing just a dirty shirty. You are alive, but not well. What ever you had in your life is gone, time to start a new one."
 
-room2 = Room("Room 2")
-room2.description = Description(
-	short="A second room.",
-	long="An empty stone room. The exit is west.",
+road_to_market = Room("CobbleStone Road")
+road_to_market.description = Description(
+	short="Long road to the market.",
+	long="A long road stretches out before you, leading towards the bustling market in the distance. The sound of merchants calling out their wares and the scent of fresh bread waft through the air.",
 )
+road_to_market.on_enter_text = "[dim]Your footsteps echo off the cold stone walls.[/dim]. You see some dark figures lurking in the shadows, but they don't seem to notice you."
 
-Room3 = Room("Room 3")
-Room3.description = Description(short="Empty room.", long="Empty room that has two doors.")
+marketSquare = Room("Market Square")
+marketSquare.description = Description(short="Empty room.", long="Empty room that has two doors.")
+marketSquare.on_enter_action = lambda player, room: [f"[yellow]A draft chills {player.name} to the bone.[/yellow]"]
 
 # Wire up room connections (bidirectional)
-intro_room.add_connection(room2, Direction.EAST)
-intro_room.add_connection(introTown.square, Direction.NORTH)
-intro_room.add_connection(Room3, Direction.NORTH_EAST)
-Room3.add_connection(room2, Direction.SOUTH)
+roadside.add_connection(road_to_market, Direction.EAST)
+road_to_market.add_connection(marketSquare, Direction.EAST)
 
 # -- items --
 
-# Example short sword placed in the demo area
-sword = ShortSword(
-	name="Short Sword", durability=100, degrades=False, reach=1, is_magical=False, attackBonus=2, onHitEffect=[]
-)
-sword.description = Description(
-	short="A basic short sword.",
-	long="A basic short sword lies here, its blade gleaming with a dull sheen. It looks sturdy and reliable, perfect for a novice adventurer.",
-)
+# # Example short sword placed in the demo area
+# sword = ShortSword(
+# 	name="Short Sword", durability=100, degrades=False, reach=1, is_magical=False, attackBonus=2, onHitEffect=[]
+# )
+# sword.description = Description(
+# 	short="A basic short sword.",
+# 	long="A basic short sword lies here, its blade gleaming with a dull sheen. It looks sturdy and reliable, perfect for a novice adventurer.",
+# )
 
-intro_room.present_items.append(sword)
 
 # -- NPCs --
 
-demo_quest = DemoQuest()
+# 1st quest
+look_like_a_decent_person = LookLikeADecentPerson()
 
-guide = NonPlayerCharacter(
-	name="Old Guide",
-	has_enters_the_room=False,
-	quest=demo_quest,
-	current_hp=20,
-	current_stamina=10,
-	base_attack=1,
+shopkeeper = NonPlayerCharacter(
+	name="Charles Willoby",
+	has_enters_the_room=True,
+	quest=look_like_a_decent_person,
+	current_hp=50,
+	current_stamina=30,
+	base_attack=5,
 	race=CharacterRaceOptions.HUMAN,
-	character_class=CharacterClassOptions.WARRIOR,
+	character_class=CharacterClassOptions.ROGUE,
 	characterSize=CharacterSize.MEDIUM,
 	inventory=[],
 )
-guide.description = Description(
-	short="An old guide.",
-	long="A weathered old man leans against the wall, eyes twinkling with quiet wisdom. He looks like he wants to talk.",
-)
 
-intro_room.present_characters.append(guide)
+shopkeeper.description = Description(
+	short="A friendly shopkeeper.",
+	long="A friendly shopkeeper stands behind a food stall, his eyes twinkling with mischief and kindness. He seems approachable and eager to help.",
+)
+marketSquare.add_character(shopkeeper)
+
+# demo_quest = DemoQuest()
+
+# guide = NonPlayerCharacter(
+# 	name="Old Guide",
+# 	has_enters_the_room=False,
+# 	quest=demo_quest,
+# 	current_hp=20,
+# 	current_stamina=10,
+# 	base_attack=1,
+# 	race=CharacterRaceOptions.HUMAN,
+# 	character_class=CharacterClassOptions.WARRIOR,
+# 	characterSize=CharacterSize.MEDIUM,
+# 	inventory=[],
+# )
+# guide.description = Description(
+# 	short="An old guide.",
+# 	long="A weathered old man leans against the wall, eyes twinkling with quiet wisdom. He looks like he wants to talk.",
+# )
+
 
 # -- area entry point --
 
-START_ROOM = intro_room
+START_ROOM = roadside

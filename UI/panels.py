@@ -42,8 +42,8 @@ class EventHistoryPanel:
 		)
 
 
-class CurrentEventsPanel:
-	"""Main view showing room name, description, exits, and items."""
+class RoomInfoPanel:
+	"""Pinned room header showing name, description, exits, and items."""
 
 	def __init__(self, room: Room) -> None:
 		self._room = room
@@ -64,6 +64,23 @@ class CurrentEventsPanel:
 				parts.append(f"  - {item.name}")
 		return Panel(
 			Text.from_markup("\n".join(parts)),
+			title="[bold]Room[/bold]",
+			border_style="green",
+			box=box.ROUNDED,
+		)
+
+
+class CurrentEventsPanel:
+	"""Scrollable feed of current events (NPC dialog, quest updates, etc.)."""
+
+	def __init__(self, current_events: list[str], visible_count: int = 10) -> None:
+		self._events = current_events
+		self._visible = visible_count
+
+	def build(self) -> Panel:
+		lines = "\n".join(self._events[-self._visible :])
+		return Panel(
+			Text.from_markup(lines),
 			title="[bold]Current Events[/bold]",
 			border_style="green",
 			box=box.ROUNDED,
