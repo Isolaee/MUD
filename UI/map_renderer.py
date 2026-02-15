@@ -74,7 +74,7 @@ class MapRenderer:
 		return Panel(
 			Text.from_markup(out),
 			title="[bold]Map[/bold]",
-			border_style="yellow",
+			border_style="cyan",
 			box=box.ROUNDED,
 		)
 
