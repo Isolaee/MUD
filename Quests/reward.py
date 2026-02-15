@@ -7,6 +7,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum, auto
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+	from Objects.Items.item import Item
 
 
 class RewardType(Enum):
@@ -34,3 +38,4 @@ class Reward:
 	description: str
 	value: int = 0
 	item_name: str | None = None
+	item: Item | None = None

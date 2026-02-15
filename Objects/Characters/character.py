@@ -83,6 +83,7 @@ class PlayerCharacter(Character):
 		self.equipped_weapon: Weapon | None = None
 		self.is_knocked_out: bool = False
 		self.visited_rooms: set[Room] = set()
+		self.quests: list[Quest] = []
 
 	def create_character(
 		self, name: str, race: CharacterRaceOptions, character_class: CharacterClassOptions

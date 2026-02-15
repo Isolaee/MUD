@@ -64,6 +64,7 @@ class Quest(GameObject, ABC):
 	) -> None:
 		super().__init__(name)
 		self.description: Description | None = None
+		self.completed_description: Description | None = None
 		self.status: QuestStatus = QuestStatus.NOT_STARTED
 		self.current_stage: QuestStage = QuestStage.STAGE_1
 		self.objectives: list[Objective] = objectives or []

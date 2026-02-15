@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING
 
 from rich.layout import Layout
 
-from Objects.Characters.character import PlayerCharacter
+from Objects.Characters.character import NonPlayerCharacter, PlayerCharacter
 from Objects.Rooms.room import Room
 from UI.commands import CommandDispatcher
 from UI.map_renderer import MapRenderer
@@ -31,6 +31,7 @@ from UI.panels import (
 	EventHistoryPanel,
 	RoomCharactersPanel,
 	RoomChat,
+	RoomInfoPanel,
 	StatsPanel,
 )
 from UI.viewsClass import View
@@ -72,6 +73,8 @@ class GameUI(View):
 			"[dim]Welcome to the MUD! Type [bold]help[/bold] for commands.[/dim]",
 		]
 		self.room_chat: list[str] = []
+		self.current_events: list[str] = []
+		self.last_talked_npc: NonPlayerCharacter | None = None
 		self._dispatcher = CommandDispatcher()
 
 		# Register with the shared world
@@ -175,6 +178,7 @@ class GameUI(View):
 			Layout(name="events", ratio=1),
 		)
 		layout["middle"].split_column(
+			Layout(name="room_info", size=10),
 			Layout(name="current_events", ratio=1),
 			Layout(name="Core-stats", size=3),  ## hp and secondary resource bar (mana/stamina)
 			Layout(name="writing", size=3),
@@ -187,7 +191,8 @@ class GameUI(View):
 
 		layout["chat"].update(RoomChat(self.room_chat, visible_count=5).build())
 		layout["events"].update(EventHistoryPanel(self.event_history).build())
-		layout["current_events"].update(CurrentEventsPanel(self.current_room).build())
+		layout["room_info"].update(RoomInfoPanel(self.current_room).build())
+		layout["current_events"].update(CurrentEventsPanel(self.current_events).build())
 		layout["Core-stats"].update(CoreStatsPanel(self.player).build())
 		layout["writing"].update(CommandInputPanel(self.input_buffer).build())
 		layout["map"].update(MapRenderer(self.current_room, self.visited_rooms).build())

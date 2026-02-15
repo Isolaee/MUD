@@ -13,8 +13,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from Objects.Characters.character import Character
+from Objects.Characters.character import Character, NonPlayerCharacter
 from logic.actions import Action, execute, parse
+from Quests.quest import QuestStatus
 from UI.panels import CHAT_CHAR, CHAT_CHAT_CHAR, CHAT_CHAT_TEXT, CHAT_TEXT
 
 if TYPE_CHECKING:
@@ -77,6 +78,17 @@ class CommandDispatcher:
 			)
 			return
 
+		# Handle accept — quest accept takes priority, falls through to party
+		if action == Action.ACCEPT:
+			quest_messages = self._try_accept_quest(inputs, ui)
+			if quest_messages is not None:
+				if ui.current_events:
+					ui.current_events.append("")
+				ui.current_events.extend(quest_messages)
+				self._trim_history(ui)
+				return
+			# No quest context — fall through to party accept
+
 		# Handle party commands via PartyManager
 		if world and char_id and action in _PARTY_ACTIONS:
 			messages = self._handle_party_action(action, inputs, ui, world, char_id)
@@ -94,9 +106,19 @@ class CommandDispatcher:
 				return
 			# If target wasn't resolved, fall through to show error from result
 
-		ui.event_history.extend(result.messages)
+		# NPC dialog shows in the Current Events panel, not event history
+		if action == Action.TALK_TO:
+			target = inputs[0] if inputs else None
+			ui.last_talked_npc = target if isinstance(target, NonPlayerCharacter) else None
+			if ui.current_events:
+				ui.current_events.append("")
+			ui.current_events.extend(result.messages)
+		else:
+			ui.event_history.extend(result.messages)
 
 		if result.new_room is not None:
+			ui.current_events = []
+			ui.last_talked_npc = None
 			if world is not None and char_id is not None:
 				moved = world.move_player(char_id, result.new_room)
 				if not moved:
@@ -105,6 +127,16 @@ class CommandDispatcher:
 					return
 			ui.current_room = result.new_room
 			ui.visited_rooms.add(result.new_room)
+
+			# Room visit triggers
+			if not ui.player.has_visited(result.new_room):
+				if result.new_room.first_time_visited_text:
+					ui.event_history.append(result.new_room.first_time_visited_text)
+				ui.player.visit_room(result.new_room)
+			if result.new_room.on_enter_text:
+				ui.event_history.append(result.new_room.on_enter_text)
+			if result.new_room.on_enter_action:
+				ui.event_history.extend(result.new_room.on_enter_action(ui.player, result.new_room))
 
 		if result.quit:
 			ui.running = False
@@ -144,6 +176,34 @@ class CommandDispatcher:
 			return pm.show_party(char_id, world)
 
 		return []
+
+	@staticmethod
+	def _try_accept_quest(inputs: list, ui: GameUI) -> list[str] | None:
+		"""Try to accept quest(s) from the last talked NPC.
+
+		Returns a list of messages for the current events panel,
+		or None if there's no quest context (so caller falls through
+		to party accept).
+		"""
+		npc = ui.last_talked_npc
+		if npc is None or npc.quest is None:
+			return None
+
+		quest = npc.quest
+		if quest.status != QuestStatus.NOT_STARTED:
+			return [f"[dim]You have already accepted '{quest.name}'.[/dim]"]
+
+		# If a quest name was given, check it matches
+		quest_name_filter = inputs[0] if inputs else None
+		if quest_name_filter and quest_name_filter.lower() != quest.name.lower():
+			return [f"[red]No quest called '{quest_name_filter}' is available here.[/red]"]
+
+		quest.start()
+		ui.player.quests.append(quest)
+		return [
+			f"[green]Quest accepted: {quest.name}[/green]",
+			f"[dim]{quest.objectives[0].description}[/dim]" if quest.objectives else "",
+		]
 
 	@staticmethod
 	def _trim_history(ui: GameUI) -> None:
