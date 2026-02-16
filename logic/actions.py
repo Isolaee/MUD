@@ -352,6 +352,10 @@ def _exec_talk_to(inputs: list, current_room: Room) -> ActionResult:
 				elif desc and desc.short:
 					result.messages.append(f"[dim]{desc.short}[/dim]")
 				result.messages.append(f"[yellow]Quest available: {quest.name}[/yellow]")
+				if quest.public_requirements:
+					result.messages.append("[yellow]Requirements:[/yellow]")
+					for req in quest.public_requirements:
+						result.messages.append(f"  [yellow]- {req.description}[/yellow]")
 			elif quest.status == QuestStatus.IN_PROGRESS:
 				# Advance TALK_TO objectives that match this NPC
 				for obj in quest.objectives:

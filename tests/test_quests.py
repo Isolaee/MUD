@@ -1,7 +1,8 @@
-"""Tests for quest system — Quest, Objective, Reward."""
+"""Tests for quest system — Quest, Objective, Reward, Requirement."""
 
 from Quests.objective import Objective, ObjectiveType
 from Quests.quest import Quest, QuestStage, QuestStatus
+from Quests.requirement import Requirement, RequirementType
 from Quests.reward import Reward, RewardType
 
 
@@ -143,3 +144,152 @@ class TestQuest:
 		for _ in range(10):
 			q.advance_stage()
 		assert q.current_stage == QuestStage.STAGE_5
+
+
+# ---------------------------------------------------------------------------
+# Helpers for requirement tests
+# ---------------------------------------------------------------------------
+
+
+class _MockPlayer:
+	"""Lightweight stand-in for PlayerCharacter in requirement tests."""
+
+	def __init__(self, level=1, quests=None, inventory=None):
+		self.level = level
+		self.quests = quests or []
+		self.inventory = inventory or []
+
+
+class _MockItem:
+	def __init__(self, name: str):
+		self.name = name
+
+
+def _make_requirement(req_type, description="req", target="", value=0):
+	return Requirement(
+		req_type=req_type,
+		description=description,
+		target=target,
+		value=value,
+	)
+
+
+# ---------------------------------------------------------------------------
+# Requirement.check tests
+# ---------------------------------------------------------------------------
+
+
+class TestRequirement:
+	def test_level_requirement_met(self):
+		req = _make_requirement(RequirementType.LEVEL, value=5)
+		player = _MockPlayer(level=5)
+		assert req.check(player)
+
+	def test_level_requirement_not_met(self):
+		req = _make_requirement(RequirementType.LEVEL, value=10)
+		player = _MockPlayer(level=3)
+		assert not req.check(player)
+
+	def test_level_defaults_to_zero_when_missing(self):
+		req = _make_requirement(RequirementType.LEVEL, value=1)
+		player = _MockPlayer()
+		del player.level
+		assert not req.check(player)
+
+	def test_quest_completed_requirement_met(self):
+		completed_quest = ConcreteQuest("First Steps")
+		completed_quest.status = QuestStatus.TURNED_IN
+		req = _make_requirement(RequirementType.QUEST_COMPLETED, target="First Steps")
+		player = _MockPlayer(quests=[completed_quest])
+		assert req.check(player)
+
+	def test_quest_completed_requirement_not_met(self):
+		in_progress = ConcreteQuest("First Steps")
+		in_progress.status = QuestStatus.IN_PROGRESS
+		req = _make_requirement(RequirementType.QUEST_COMPLETED, target="First Steps")
+		player = _MockPlayer(quests=[in_progress])
+		assert not req.check(player)
+
+	def test_quest_completed_case_insensitive(self):
+		q = ConcreteQuest("First Steps")
+		q.status = QuestStatus.TURNED_IN
+		req = _make_requirement(RequirementType.QUEST_COMPLETED, target="first steps")
+		player = _MockPlayer(quests=[q])
+		assert req.check(player)
+
+	def test_item_requirement_met(self):
+		req = _make_requirement(RequirementType.ITEM, target="Iron Key")
+		player = _MockPlayer(inventory=[_MockItem("Iron Key")])
+		assert req.check(player)
+
+	def test_item_requirement_not_met(self):
+		req = _make_requirement(RequirementType.ITEM, target="Iron Key")
+		player = _MockPlayer(inventory=[])
+		assert not req.check(player)
+
+	def test_item_requirement_case_insensitive(self):
+		req = _make_requirement(RequirementType.ITEM, target="iron key")
+		player = _MockPlayer(inventory=[_MockItem("Iron Key")])
+		assert req.check(player)
+
+
+# ---------------------------------------------------------------------------
+# Quest.can_accept tests
+# ---------------------------------------------------------------------------
+
+
+class TestCanAccept:
+	def test_no_requirements_can_accept(self):
+		q = ConcreteQuest("Open Quest")
+		player = _MockPlayer()
+		can, unmet = q.can_accept(player)
+		assert can
+		assert unmet == []
+
+	def test_public_requirement_met(self):
+		req = _make_requirement(RequirementType.LEVEL, description="Level 5", value=5)
+		q = ConcreteQuest("Quest", public_requirements=[req])
+		player = _MockPlayer(level=10)
+		can, unmet = q.can_accept(player)
+		assert can
+		assert unmet == []
+
+	def test_public_requirement_not_met(self):
+		req = _make_requirement(RequirementType.LEVEL, description="Reach level 5", value=5)
+		q = ConcreteQuest("Quest", public_requirements=[req])
+		player = _MockPlayer(level=2)
+		can, unmet = q.can_accept(player)
+		assert not can
+		assert unmet == ["Reach level 5"]
+
+	def test_hidden_requirement_not_met_no_descriptions(self):
+		req = _make_requirement(RequirementType.LEVEL, description="secret", value=99)
+		q = ConcreteQuest("Quest", hidden_requirements=[req])
+		player = _MockPlayer(level=1)
+		can, unmet = q.can_accept(player)
+		assert not can
+		assert unmet == []  # hidden requirements don't expose descriptions
+
+	def test_hidden_requirement_met(self):
+		req = _make_requirement(RequirementType.LEVEL, value=1)
+		q = ConcreteQuest("Quest", hidden_requirements=[req])
+		player = _MockPlayer(level=5)
+		can, unmet = q.can_accept(player)
+		assert can
+
+	def test_mixed_requirements_all_met(self):
+		pub = _make_requirement(RequirementType.LEVEL, description="Level 3", value=3)
+		hid = _make_requirement(RequirementType.ITEM, target="Key")
+		q = ConcreteQuest("Quest", public_requirements=[pub], hidden_requirements=[hid])
+		player = _MockPlayer(level=5, inventory=[_MockItem("Key")])
+		can, unmet = q.can_accept(player)
+		assert can
+
+	def test_mixed_requirements_public_fails(self):
+		pub = _make_requirement(RequirementType.LEVEL, description="Level 10", value=10)
+		hid = _make_requirement(RequirementType.ITEM, target="Key")
+		q = ConcreteQuest("Quest", public_requirements=[pub], hidden_requirements=[hid])
+		player = _MockPlayer(level=5, inventory=[_MockItem("Key")])
+		can, unmet = q.can_accept(player)
+		assert not can
+		assert unmet == ["Level 10"]
