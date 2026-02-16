@@ -198,6 +198,14 @@ class CommandDispatcher:
 		if quest_name_filter and quest_name_filter.lower() != quest.name.lower():
 			return [f"[red]No quest called '{quest_name_filter}' is available here.[/red]"]
 
+		# Check requirements before accepting
+		can_accept, unmet = quest.can_accept(ui.player)
+		if not can_accept:
+			messages = [f"[red]You cannot accept '{quest.name}' yet.[/red]"]
+			for desc in unmet:
+				messages.append(f"  [yellow]- {desc}[/yellow]")
+			return messages
+
 		quest.start()
 		ui.player.quests.append(quest)
 		return [
