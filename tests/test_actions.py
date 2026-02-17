@@ -8,6 +8,8 @@ from Objects.Characters.character import (
 from Objects.Characters.characterRaces import CharacterSize
 from Objects.Items.Swords.shortSword import ShortSword
 from Objects.Rooms.room import Description, Direction, Room
+from Quests.objective import Objective, ObjectiveType
+from Quests.quest import QuestStatus
 from logic.actions import Action, parse, execute
 
 
@@ -211,3 +213,91 @@ class TestExecute:
 		room = Room("R")
 		result = execute(Action.QUIT, [], room)
 		assert result.quit is True
+
+
+# -- NPC interact tests --
+
+
+def _make_npc(name="Guide", quest=None):
+	"""Create an NPC with optional quest."""
+	return NonPlayerCharacter(
+		has_enters_the_room=False,
+		quest=quest,
+		current_hp=50,
+		current_stamina=50,
+		base_attack=5,
+		race=CharacterRaceOptions.HUMAN,
+		character_class=CharacterClassOptions.CLERIC,
+		characterSize=CharacterSize.MEDIUM,
+		inventory=[],
+		name=name,
+	)
+
+
+def _make_quest(npc_name="Guide"):
+	"""Create a simple talk-to quest targeting the given NPC name."""
+	from Quests.demoQuest import DemoQuest
+
+	quest = DemoQuest()
+	# Override the objective to target our NPC
+	quest.objectives = [
+		Objective(
+			description="Talk to the guide.",
+			objective_type=ObjectiveType.TALK_TO,
+			target_name=npc_name,
+		),
+	]
+	quest.completed_description = Description("Done!", "You completed the quest.")
+	return quest
+
+
+class TestNpcInteract:
+	def test_no_quest_npc(self):
+		npc = _make_npc()
+		messages = npc.interact()
+		assert any("nothing to say" in m for m in messages)
+
+	def test_quest_not_started_shows_offer(self):
+		quest = _make_quest()
+		npc = _make_npc(quest=quest)
+		messages = npc.interact()
+		assert any("Quest available" in m for m in messages)
+		assert any(quest.name in m for m in messages)
+
+	def test_quest_in_progress_advances_talk_objective(self):
+		quest = _make_quest()
+		quest.start()
+		npc = _make_npc(quest=quest)
+		messages = npc.interact()
+		# Quest should auto-complete and turn in since the objective matches
+		assert quest.status == QuestStatus.TURNED_IN
+		assert any("Quest completed" in m for m in messages)
+
+	def test_quest_in_progress_no_matching_objective(self):
+		quest = _make_quest(npc_name="Someone Else")
+		quest.start()
+		npc = _make_npc(quest=quest)
+		messages = npc.interact()
+		assert quest.status == QuestStatus.IN_PROGRESS
+		assert any("in progress" in m for m in messages)
+
+	def test_quest_completed_turns_in(self):
+		quest = _make_quest()
+		quest.start()
+		quest.objectives[0].advance()
+		quest.complete()
+		assert quest.status == QuestStatus.COMPLETED
+		npc = _make_npc(quest=quest)
+		messages = npc.interact()
+		assert quest.status == QuestStatus.TURNED_IN
+		assert any("Quest completed" in m for m in messages)
+
+	def test_quest_turned_in_nothing_more(self):
+		quest = _make_quest()
+		quest.start()
+		quest.objectives[0].advance()
+		quest.complete()
+		quest.turn_in()
+		npc = _make_npc(quest=quest)
+		messages = npc.interact()
+		assert any("nothing more" in m for m in messages)

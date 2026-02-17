@@ -10,8 +10,8 @@ This module implements the two-phase command pipeline:
 
 Adding a new command requires:
 - A new ``Action`` enum member.
-- A ``_resolve_*`` helper (if the command takes arguments).
-- A ``_exec_*`` handler registered in ``execute()``.
+- An entry in ``_PARSE_TABLE`` (with a resolver if the command takes arguments).
+- An entry in ``_EXEC_HANDLERS``.
 """
 
 from __future__ import annotations
@@ -21,8 +21,6 @@ from enum import Enum, auto
 
 from Objects.Characters.character import NonPlayerCharacter
 from Objects.Rooms.room import Room
-from Quests.objective import ObjectiveType
-from Quests.quest import QuestStatus
 
 # Maps alias -> canonical command name.
 # Canonical commands map to themselves implicitly.
@@ -45,22 +43,23 @@ COMMAND_ALIASES: dict[str, str] = {
 	"lp": "leave-party",
 }
 
-# Maps each known verb to the type of targets it expects.
-# Used by tab_completion to generate context-aware candidates.
+# Maps each known verb to the type of targets it expects for tab completion.
 # None means the command takes no arguments.
+# Implemented commands are listed here alongside stubs for future commands.
 _CANONICAL_COMMANDS: dict[str, str | None] = {
 	"look": "look_targets",
 	"move": "rooms",
-	"inventory": None,
-	"help": None,
-	"quit": None,
 	"attack": "characters",
+	"invite": "characters",
+	"talk-to": "characters",
 	"inspect": "all",
 	"pick-up": "items",
 	"drop": "items",
-	"talk-to": "characters",
 	"whisper": "characters",
-	"invite": "characters",
+	# Commands with no tab-completion targets
+	"inventory": None,
+	"help": None,
+	"quit": None,
 	"accept": None,
 	"decline": None,
 	"leave-party": None,
@@ -86,7 +85,7 @@ class Action(Enum):
 	MOVE = auto()
 	INVENTORY = auto()
 	ATTACK = auto()
-	Inspect = auto()
+	INSPECT = auto()
 	PICK_UP = auto()
 	DROP = auto()
 	TALK_TO = auto()
@@ -114,98 +113,6 @@ class ActionResult:
 	messages: list[str] = field(default_factory=list)
 	new_room: Room | None = None
 	quit: bool = False
-
-
-def parse(raw: str, current_room: Room) -> tuple[Action, list]:
-	"""Parse raw user input into an Action and its resolved inputs.
-
-	The first whitespace-delimited token is treated as the verb;
-	everything after it is the argument.  If input is empty, defaults
-	to LOOK at the current room.  Unrecognised verbs are treated as
-	shorthand MOVE (i.e. typing a room name moves there).
-
-	Returns:
-		(Action, inputs) where *inputs* are resolved game objects
-		or raw strings if resolution failed.
-	"""
-	parts = raw.strip().lower().split(None, 1)
-	if not parts:
-		return Action.LOOK, [current_room]
-
-	verb = parts[0]
-	arg = parts[1] if len(parts) > 1 else ""
-
-	# Resolve aliases to canonical command names
-	verb = COMMAND_ALIASES.get(verb, verb)
-
-	if verb == "look":
-		return Action.LOOK, [_resolve_look_target(arg, current_room)]
-
-	if verb == "inventory":
-		return Action.INVENTORY, []
-
-	if verb == "help":
-		return Action.HELP, []
-
-	if verb == "quit":
-		return Action.QUIT, []
-
-	if verb == "attack":
-		target = _resolve_attack_target(arg, current_room)
-		return Action.ATTACK, [target]
-
-	if verb == "invite":
-		target = _resolve_attack_target(arg, current_room)
-		return Action.INVITE, [target]
-
-	if verb == "accept":
-		return Action.ACCEPT, [arg] if arg else []
-
-	if verb == "decline":
-		return Action.DECLINE, []
-
-	if verb == "leave-party":
-		return Action.LEAVE_PARTY, []
-
-	if verb == "party":
-		return Action.PARTY, []
-
-	if verb == "talk-to":
-		target = _resolve_character_target(arg, current_room)
-		return Action.TALK_TO, [target]
-
-	if verb == "chat":
-		return Action.CHAT, [arg]
-
-	if verb == "move" and arg:
-		target = _resolve_move_target(arg, current_room)
-		return Action.MOVE, [target]
-
-	# Bare word — try the full input as a room name (shorthand move)
-	full = raw.strip().lower()
-	target = _resolve_move_target(full, current_room)
-	return Action.MOVE, [target]
-
-
-def execute(action: Action, inputs: list, current_room: Room) -> ActionResult:
-	"""Dispatch *action* to the matching handler and return the result."""
-	handlers = {
-		Action.LOOK: _exec_look,
-		Action.MOVE: _exec_move,
-		Action.INVENTORY: _exec_inventory,
-		Action.ATTACK: _exec_attack,
-		Action.TALK_TO: _exec_talk_to,
-		Action.HELP: _exec_help,
-		Action.QUIT: _exec_quit,
-		# Chat and party commands return empty results; handled by CommandDispatcher
-		Action.CHAT: _exec_noop,
-		Action.INVITE: _exec_noop,
-		Action.ACCEPT: _exec_noop,
-		Action.DECLINE: _exec_noop,
-		Action.LEAVE_PARTY: _exec_noop,
-		Action.PARTY: _exec_noop,
-	}
-	return handlers[action](inputs, current_room)
 
 
 # ---------------------------------------------------------------------------
@@ -240,29 +147,84 @@ def _resolve_move_target(arg: str, current_room: Room):
 	return arg  # unresolved
 
 
-def _resolve_character_target(arg: str, current_room: Room):
-	"""Resolve a character target by matching against characters in the room."""
+def _resolve_character_target(arg: str, current_room: Room, include_players: bool = False):
+	"""Resolve a character target by name in the current room.
+
+	Searches NPCs first, then optionally players.
+	"""
 	if not arg:
 		return arg
 	for char in current_room.present_characters:
 		if char.name.lower() == arg:
 			return char
+	if include_players:
+		for player in current_room.present_players:
+			if player.name.lower() == arg:
+				return player
 	return arg  # unresolved
 
 
-def _resolve_attack_target(arg: str, current_room: Room):
-	"""Resolve an attack/invite target — NPCs and other players."""
-	if not arg:
-		return arg
-	# Check NPCs first
-	for char in current_room.present_characters:
-		if char.name.lower() == arg:
-			return char
-	# Check other players
-	for player in current_room.present_players:
-		if player.name.lower() == arg:
-			return player
-	return arg  # unresolved
+# ---------------------------------------------------------------------------
+# Parse table — maps canonical verb to (Action, resolver)
+# ---------------------------------------------------------------------------
+
+# Maps canonical verb -> (Action, resolver | "raw" | None).
+# - None: no arguments expected.
+# - "raw": pass the raw argument string as-is.
+# - callable: resolver(arg, current_room) -> resolved target.
+_PARSE_TABLE: dict[str, tuple[Action, object]] = {
+	"look": (Action.LOOK, _resolve_look_target),
+	"move": (Action.MOVE, _resolve_move_target),
+	"inventory": (Action.INVENTORY, None),
+	"help": (Action.HELP, None),
+	"quit": (Action.QUIT, None),
+	"attack": (Action.ATTACK, lambda arg, room: _resolve_character_target(arg, room, include_players=True)),
+	"invite": (Action.INVITE, lambda arg, room: _resolve_character_target(arg, room, include_players=True)),
+	"accept": (Action.ACCEPT, "raw"),
+	"decline": (Action.DECLINE, None),
+	"leave-party": (Action.LEAVE_PARTY, None),
+	"party": (Action.PARTY, None),
+	"talk-to": (Action.TALK_TO, _resolve_character_target),
+	"chat": (Action.CHAT, "raw"),
+}
+
+
+def parse(raw: str, current_room: Room) -> tuple[Action, list]:
+	"""Parse raw user input into an Action and its resolved inputs.
+
+	The first whitespace-delimited token is treated as the verb;
+	everything after it is the argument.  If input is empty, defaults
+	to LOOK at the current room.  Unrecognised verbs are treated as
+	shorthand MOVE (i.e. typing a room name moves there).
+
+	Returns:
+		(Action, inputs) where *inputs* are resolved game objects
+		or raw strings if resolution failed.
+	"""
+	parts = raw.strip().lower().split(None, 1)
+	if not parts:
+		return Action.LOOK, [current_room]
+
+	verb = parts[0]
+	arg = parts[1] if len(parts) > 1 else ""
+
+	# Resolve aliases to canonical command names
+	verb = COMMAND_ALIASES.get(verb, verb)
+
+	entry = _PARSE_TABLE.get(verb)
+	if entry is not None:
+		action, resolver = entry
+		if resolver is None:
+			return action, []
+		if resolver == "raw":
+			return action, [arg] if arg else []
+		return action, [resolver(arg, current_room)]
+
+	# Unrecognised verbs are treated as shorthand MOVE
+	# (typing a room name moves there).
+	full = raw.strip().lower()
+	target = _resolve_move_target(full, current_room)
+	return Action.MOVE, [target]
 
 
 # ---------------------------------------------------------------------------
@@ -320,12 +282,17 @@ def _exec_move(inputs: list, current_room: Room) -> ActionResult:
 
 
 def _exec_inventory(inputs: list, current_room: Room) -> ActionResult:
-	"""List items present in the current room."""
+	"""List items on the ground in the current room.
+
+	NOTE: A proper player inventory command would require passing the
+	player object through the execute pipeline.
+	"""
 	result = ActionResult()
 	items = current_room.present_items
 	if not items:
 		result.messages.append("[dim]Nothing here.[/dim]")
 	else:
+		result.messages.append("[bold]Items here:[/bold]")
 		for item in items:
 			result.messages.append(f"  [white]- {item.name}[/white]")
 	return result
@@ -342,60 +309,7 @@ def _exec_talk_to(inputs: list, current_room: Room) -> ActionResult:
 	target = inputs[0]
 
 	if isinstance(target, NonPlayerCharacter):
-		result.messages.append(f"[dim]You talk to {target.name}.[/dim]")
-		if target.quest is not None:
-			quest = target.quest
-			if quest.status == QuestStatus.NOT_STARTED:
-				desc = quest.description
-				if desc and desc.long:
-					result.messages.append(f"[dim]{desc.long}[/dim]")
-				elif desc and desc.short:
-					result.messages.append(f"[dim]{desc.short}[/dim]")
-				result.messages.append(f"[yellow]Quest available: {quest.name}[/yellow]")
-				if quest.public_requirements:
-					result.messages.append("[yellow]Requirements:[/yellow]")
-					for req in quest.public_requirements:
-						result.messages.append(f"  [yellow]- {req.description}[/yellow]")
-			elif quest.status == QuestStatus.IN_PROGRESS:
-				# Advance TALK_TO objectives that match this NPC
-				for obj in quest.objectives:
-					if (
-						obj.objective_type == ObjectiveType.TALK_TO
-						and not obj.is_complete()
-						and obj.target_name.lower() == target.name.lower()
-					):
-						obj.advance()
-				# Check if all objectives are now done
-				quest.complete()
-				if quest.status == QuestStatus.COMPLETED:
-					# Auto turn-in since we're talking to the quest giver
-					rewards = quest.turn_in()
-					desc = quest.completed_description
-					if desc and desc.long:
-						result.messages.append(f"[dim]{desc.long}[/dim]")
-					elif desc and desc.short:
-						result.messages.append(f"[dim]{desc.short}[/dim]")
-					result.messages.append(f"[green]Quest completed: {quest.name}[/green]")
-					for reward in rewards:
-						result.messages.append(f"  [yellow]- {reward.description}[/yellow]")
-				else:
-					result.messages.append(f"[dim]{target.name} nods at you.[/dim]")
-					result.messages.append(f"[yellow]Quest in progress: {quest.name}[/yellow]")
-			elif quest.status == QuestStatus.COMPLETED:
-				# Quest done but not yet turned in — turn in now
-				rewards = quest.turn_in()
-				desc = quest.completed_description
-				if desc and desc.long:
-					result.messages.append(f"[dim]{desc.long}[/dim]")
-				elif desc and desc.short:
-					result.messages.append(f"[dim]{desc.short}[/dim]")
-				result.messages.append(f"[green]Quest completed: {quest.name}[/green]")
-				for reward in rewards:
-					result.messages.append(f"  [yellow]- {reward.description}[/yellow]")
-			elif quest.status == QuestStatus.TURNED_IN:
-				result.messages.append(f"[dim]{target.name} has nothing more for you.[/dim]")
-		else:
-			result.messages.append(f"[dim]{target.name} has nothing to say.[/dim]")
+		result.messages = target.interact()
 	elif isinstance(target, str):
 		result.messages.append(f"[red]You don't see '{target}' here.[/red]")
 	else:
@@ -438,3 +352,30 @@ def _exec_noop(inputs: list, current_room: Room) -> ActionResult:
 def _exec_quit(inputs: list, current_room: Room) -> ActionResult:
 	"""Signal the game loop to exit."""
 	return ActionResult(quit=True)
+
+
+# ---------------------------------------------------------------------------
+# Execution dispatch table — built once at module level
+# ---------------------------------------------------------------------------
+
+_EXEC_HANDLERS: dict[Action, callable] = {
+	Action.LOOK: _exec_look,
+	Action.MOVE: _exec_move,
+	Action.INVENTORY: _exec_inventory,
+	Action.ATTACK: _exec_attack,
+	Action.TALK_TO: _exec_talk_to,
+	Action.HELP: _exec_help,
+	Action.QUIT: _exec_quit,
+	# Chat and party commands return empty results; handled by CommandDispatcher
+	Action.CHAT: _exec_noop,
+	Action.INVITE: _exec_noop,
+	Action.ACCEPT: _exec_noop,
+	Action.DECLINE: _exec_noop,
+	Action.LEAVE_PARTY: _exec_noop,
+	Action.PARTY: _exec_noop,
+}
+
+
+def execute(action: Action, inputs: list, current_room: Room) -> ActionResult:
+	"""Dispatch *action* to the matching handler and return the result."""
+	return _EXEC_HANDLERS[action](inputs, current_room)

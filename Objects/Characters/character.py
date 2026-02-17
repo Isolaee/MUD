@@ -137,5 +137,73 @@ class NonPlayerCharacter(PlayerCharacter):
 		self.has_enters_the_room = has_enters_the_room
 		self.quest = quest
 
+	def interact(self) -> list[str]:
+		"""Return Rich-markup messages for talking to this NPC.
+
+		Handles quest dialog: offering quests, advancing TALK_TO
+		objectives, auto-completing and turning in quests.
+		"""
+		from Quests.objective import ObjectiveType
+		from Quests.quest import QuestStatus
+
+		messages = [f"[dim]You talk to {self.name}.[/dim]"]
+
+		if self.quest is None:
+			messages.append(f"[dim]{self.name} has nothing to say.[/dim]")
+			return messages
+
+		quest = self.quest
+
+		if quest.status == QuestStatus.NOT_STARTED:
+			desc = quest.description
+			if desc and desc.long:
+				messages.append(f"[dim]{desc.long}[/dim]")
+			elif desc and desc.short:
+				messages.append(f"[dim]{desc.short}[/dim]")
+			messages.append(f"[yellow]Quest available: {quest.name}[/yellow]")
+			if quest.public_requirements:
+				messages.append("[yellow]Requirements:[/yellow]")
+				for req in quest.public_requirements:
+					messages.append(f"  [yellow]- {req.description}[/yellow]")
+
+		elif quest.status == QuestStatus.IN_PROGRESS:
+			# Advance TALK_TO objectives that match this NPC
+			for obj in quest.objectives:
+				if (
+					obj.objective_type == ObjectiveType.TALK_TO
+					and not obj.is_complete()
+					and obj.target_name.lower() == self.name.lower()
+				):
+					obj.advance()
+			quest.complete()
+			if quest.status == QuestStatus.COMPLETED:
+				messages.extend(self._turn_in_quest(quest))
+			else:
+				messages.append(f"[dim]{self.name} nods at you.[/dim]")
+				messages.append(f"[yellow]Quest in progress: {quest.name}[/yellow]")
+
+		elif quest.status == QuestStatus.COMPLETED:
+			messages.extend(self._turn_in_quest(quest))
+
+		elif quest.status == QuestStatus.TURNED_IN:
+			messages.append(f"[dim]{self.name} has nothing more for you.[/dim]")
+
+		return messages
+
+	@staticmethod
+	def _turn_in_quest(quest: Quest) -> list[str]:
+		"""Turn in a completed quest and return reward messages."""
+		messages: list[str] = []
+		rewards = quest.turn_in()
+		desc = quest.completed_description
+		if desc and desc.long:
+			messages.append(f"[dim]{desc.long}[/dim]")
+		elif desc and desc.short:
+			messages.append(f"[dim]{desc.short}[/dim]")
+		messages.append(f"[green]Quest completed: {quest.name}[/green]")
+		for reward in rewards:
+			messages.append(f"  [yellow]- {reward.description}[/yellow]")
+		return messages
+
 	def object_type(self) -> CharacterType:
 		return CharacterType.NPC
