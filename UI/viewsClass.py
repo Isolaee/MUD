@@ -69,6 +69,12 @@ class View(ABC):
 	def _build_layout(self):
 		"""Return a Rich Layout for this view. Rebuilt every frame."""
 
+	def scroll_events_up(self) -> None:
+		"""Scroll current events history back. Override in subclasses."""
+
+	def scroll_events_down(self) -> None:
+		"""Scroll current events history forward. Override in subclasses."""
+
 	def _get_tab_candidates(self, partial: str) -> list[str]:
 		"""Return completion candidates for the current input.
 

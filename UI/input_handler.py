@@ -72,7 +72,12 @@ class InputHandler:
 				elif ch == "\x1b":
 					pass
 				elif ch in ("\x00", "\xe0"):
-					msvcrt.getwch()
+					key = msvcrt.getwch()
+					active = self._get_active_view()
+					if key == "H":  # Arrow UP
+						active.scroll_events_up()
+					elif key == "P":  # Arrow DOWN
+						active.scroll_events_down()
 				elif ch.isprintable():
 					active = self._get_active_view()
 					active.input_buffer += ch

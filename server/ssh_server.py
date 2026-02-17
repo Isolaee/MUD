@@ -188,11 +188,16 @@ class SSHGameSession:
 				break
 
 			elif char == "\x1b":
-				# Escape sequence (arrow keys etc.) — consume remaining bytes
+				# Escape sequence (arrow keys, etc.)
 				try:
 					next_char = await asyncio.wait_for(proc.stdin.read(1), timeout=0.05)
 					if next_char == "[":
-						await asyncio.wait_for(proc.stdin.read(1), timeout=0.05)
+						seq = await asyncio.wait_for(proc.stdin.read(1), timeout=0.05)
+						active = self._get_active_view()
+						if seq == "A":  # Arrow UP
+							active.scroll_events_up()
+						elif seq == "B":  # Arrow DOWN
+							active.scroll_events_down()
 				except (asyncio.TimeoutError, asyncssh.BreakReceived):
 					pass
 
