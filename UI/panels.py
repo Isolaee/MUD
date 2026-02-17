@@ -73,15 +73,25 @@ class RoomInfoPanel:
 class CurrentEventsPanel:
 	"""Scrollable feed of current events (NPC dialog, quest updates, etc.)."""
 
-	def __init__(self, current_events: list[str], visible_count: int = 10) -> None:
+	def __init__(self, current_events: list[str], visible_count: int = 10, offset: int = 0) -> None:
 		self._events = current_events
 		self._visible = visible_count
+		self._offset = offset
 
 	def build(self) -> Panel:
-		lines = "\n".join(self._events[-self._visible :])
+		if self._offset > 0:
+			end = len(self._events) - self._offset
+			start = max(0, end - self._visible)
+			visible = self._events[start:end]
+		else:
+			visible = self._events[-self._visible :]
+		lines = "\n".join(visible)
+		title = "[bold]Current Events[/bold]"
+		if self._offset > 0:
+			title += " [dim](history)[/dim]"
 		return Panel(
 			Text.from_markup(lines),
-			title="[bold]Current Events[/bold]",
+			title=title,
 			border_style="cyan",
 			box=box.ROUNDED,
 		)

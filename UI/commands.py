@@ -82,9 +82,7 @@ class CommandDispatcher:
 		if action == Action.ACCEPT:
 			quest_messages = self._try_accept_quest(inputs, ui)
 			if quest_messages is not None:
-				if ui.current_events:
-					ui.current_events.append("")
-				ui.current_events.extend(quest_messages)
+				ui.append_current_events(quest_messages)
 				self._trim_history(ui)
 				return
 			# No quest context — fall through to party accept
@@ -110,9 +108,7 @@ class CommandDispatcher:
 		if action == Action.TALK_TO:
 			target = inputs[0] if inputs else None
 			ui.last_talked_npc = target if isinstance(target, NonPlayerCharacter) else None
-			if ui.current_events:
-				ui.current_events.append("")
-			ui.current_events.extend(result.messages)
+			ui.append_current_events(result.messages)
 		else:
 			ui.event_history.extend(result.messages)
 

@@ -54,6 +54,7 @@ class GameUI(View):
 	"""
 
 	MAX_HISTORY = 60
+	MAX_CURRENT_EVENTS_HISTORY = 100
 
 	def __init__(
 		self,
@@ -74,6 +75,8 @@ class GameUI(View):
 		]
 		self.room_chat: list[str] = []
 		self.current_events: list[str] = []
+		self.current_events_history: list[str] = []
+		self.current_events_offset: int = 0
 		self.last_talked_npc: NonPlayerCharacter | None = None
 		self._dispatcher = CommandDispatcher()
 
@@ -100,6 +103,29 @@ class GameUI(View):
 	def _handle_input(self, text: str) -> None:
 		"""Dispatch command through the command dispatcher."""
 		self._dispatcher.dispatch(self, text)
+
+	# -- current events history --------------------------------------------
+
+	def append_current_events(self, messages: list[str]) -> None:
+		"""Append messages to current_events and the persistent history buffer."""
+		if self.current_events:
+			self.current_events.append("")
+		self.current_events.extend(messages)
+		self.current_events_history.extend(messages)
+		# Trim history to the most recent entries
+		if len(self.current_events_history) > self.MAX_CURRENT_EVENTS_HISTORY:
+			self.current_events_history = self.current_events_history[-self.MAX_CURRENT_EVENTS_HISTORY :]
+		# Reset scroll to show the latest events
+		self.current_events_offset = 0
+
+	def scroll_events_up(self) -> None:
+		"""Scroll current events history back by one line."""
+		max_offset = max(0, len(self.current_events_history) - 1)
+		self.current_events_offset = min(self.current_events_offset + 1, max_offset)
+
+	def scroll_events_down(self) -> None:
+		"""Scroll current events history forward by one line."""
+		self.current_events_offset = max(0, self.current_events_offset - 1)
 
 	# -- tab completion (delegates to base View / run_completion) ----------
 
@@ -192,7 +218,9 @@ class GameUI(View):
 		layout["chat"].update(RoomChat(self.room_chat, visible_count=5).build())
 		layout["events"].update(EventHistoryPanel(self.event_history).build())
 		layout["room_info"].update(RoomInfoPanel(self.current_room).build())
-		layout["current_events"].update(CurrentEventsPanel(self.current_events).build())
+		layout["current_events"].update(
+			CurrentEventsPanel(self.current_events_history, offset=self.current_events_offset).build()
+		)
 		layout["Core-stats"].update(CoreStatsPanel(self.player).build())
 		layout["writing"].update(CommandInputPanel(self.input_buffer).build())
 		layout["map"].update(MapRenderer(self.current_room, self.visited_rooms).build())
